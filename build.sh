@@ -26,11 +26,19 @@ fi
 echo "✅ Python3: $(python3 --version)"
 echo "✅ pipenv: $(pipenv --version)"
 
-# 清理旧构建文件
+# 清理旧构建文件（保留 spec 文件）
 echo ""
 echo "🧹 清理旧构建文件..."
-rm -rf build/ dist/ *.spec
+rm -rf build/ dist/
 echo "✅ 清理完成"
+
+# 检查 spec 文件是否存在
+if [ ! -f "perf-doctor.spec" ]; then
+    echo "❌ perf-doctor.spec 文件不存在，请确保配置文件存在"
+    exit 1
+fi
+
+echo "✅ 使用现有配置文件: perf-doctor.spec"
 
 # 安装依赖
 echo ""
@@ -40,15 +48,7 @@ pipenv install
 # 构建可执行文件
 echo ""
 echo "🔨 开始构建可执行文件..."
-pipenv run pyinstaller \
-    --clean \
-    --onefile \
-    --name perf-doctor \
-    --add-data "config.py:." \
-    --hidden-import websockets \
-    --hidden-import psutil \
-    --hidden-import requests \
-    perf_doctor.py
+pipenv run python -m PyInstaller perf-doctor.spec
 
 # 检查构建结果
 echo ""
@@ -81,6 +81,7 @@ if [ -f "dist/perf-doctor" ]; then
     echo "  ✅ 免登录分析业务页面"
     echo "  ✅ 生成详细性能报告"
     echo "  ✅ 本地一键可执行"
+    echo "  ✅ Jinja2 模板系统"
     
 else
     echo "❌ 构建失败！"

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能分析报告 - {{ report_title }}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" rel="stylesheet">
+    
+    <style>
+        .metric-card {
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .resource-row {
+            cursor: pointer;
+        }
+        .resource-details {
+            display: none;
+        }
+        .resource-details.show {
+            display: table-row;
+        }
+        .status-success { color: #198754; }
+        .status-error { color: #dc3545; }
+        .status-warning { color: #ffc107; }
+        .size-badge {
+            font-size: 0.8em;
+        }
+        .filter-badge {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-badge:hover {
+            transform: scale(1.05);
+        }
+        .filter-badge.active {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+        .search-box {
+            max-width: 300px;
+        }
+        .performance-chart {
+            height: 300px;
+        }
+        .optimization-item {
+            border-left: 4px solid #0d6efd;
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .optimization-critical {
+            border-left-color: #dc3545;
+        }
+        .optimization-warning {
+            border-left-color: #ffc107;
+        }
+        .optimization-info {
+            border-left-color: #0dcaf0;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-speedometer2"></i> 性能医生
+            </a>
+            <span class="navbar-text">
+                分析时间: {{ analysis_time }}
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <h1 class="card-title text-primary">
+                            <i class="bi bi-graph-up"></i> 性能分析报告
+                        </h1>
+                        <p class="card-text text-muted">
+                            网站: <strong>{{ url }}</strong> | 
+                            分析时间: {{ analysis_time }} | 
+                            总耗时: {{ total_duration }}ms
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="row mb-4">
+            {% for metric in key_metrics %}
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card metric-card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="display-6 text-primary mb-2">
+                            <i class="bi {{ metric.icon }}"></i>
+                        </div>
+                        <h5 class="card-title">{{ metric.name }}</h5>
+                        <h3 class="text-primary mb-0">{{ metric.value }}</h3>
+                        <small class="text-muted">{{ metric.unit }}</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history"></i> 性能指标详情
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for category, metrics in performance_metrics.items() %}
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-primary">{{ category }}</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <tbody>
+                                            {% for metric in metrics %}
+                                            <tr>
+                                                <td class="text-muted">{{ metric.name }}</td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-light text-dark">
+                                                        {{ metric.value }}{{ metric.unit }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Analysis -->
+        {% if network_analysis %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-globe"></i> 网络请求分析
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control form-control-sm search-box" 
+                                   id="resourceSearch" placeholder="搜索资源...">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary filter-badge active" 
+                                        data-filter="all">全部</button>
+                                <button type="button" class="btn btn-outline-primary filter-badge" 
+                                        data-filter="api">API ({{ network_analysis.api_count }})</button>
+                                <button type="button" class="btn btn-outline-primary filter-badge" 
+                                        data-filter="static">静态资源 ({{ network_analysis.static_count }})</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="resourceTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>类型</th>
+                                        <th>URL</th>
+                                        <th>状态</th>
+                                        <th>大小</th>
+                                        <th>耗时</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for resource in network_analysis.resources %}
+                                    <tr class="resource-row" data-type="{{ resource.type }}" data-url="{{ resource.url|lower }}">
+                                        <td>
+                                            <span class="badge bg-{{ resource.type_color }}">{{ resource.type }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 300px;" title="{{ resource.url }}">
+                                                {{ resource.url }}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="status-{{ resource.status_class }}">{{ resource.status }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary size-badge">{{ resource.size }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info size-badge">{{ resource.duration }}ms</span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary toggle-details" 
+                                                    data-resource-id="{{ loop.index }}">
+                                                查看详情
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr class="resource-details" id="details-{{ loop.index }}">
+                                        <td colspan="6">
+                                            <div class="p-3 bg-light">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <h6>请求信息</h6>
+                                                        <div class="mb-2">
+                                                            <strong>方法:</strong> 
+                                                            <span class="badge bg-primary">{{ resource.method }}</span>
+                                                        </div>
+                                                        {% if resource.request_headers %}
+                                                        <div class="mb-2">
+                                                            <strong>请求头:</strong>
+                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.request_headers|tojson(indent=2) }}</code></pre>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if resource.request_body %}
+                                                        <div class="mb-2">
+                                                            <strong>请求体:</strong>
+                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.request_body }}</code></pre>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <h6>响应信息</h6>
+                                                        {% if resource.response_headers %}
+                                                        <div class="mb-2">
+                                                            <strong>响应头:</strong>
+                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.response_headers|tojson(indent=2) }}</code></pre>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if resource.response_body %}
+                                                        <div class="mb-2">
+                                                            <strong>响应体:</strong>
+                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.response_body }}</code></pre>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Optimization Suggestions -->
+        {% if optimization_suggestions %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-lightbulb"></i> 优化建议 ({{ optimization_suggestions|length }}条)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for suggestion in optimization_suggestions %}
+                        <div class="optimization-item optimization-{{ suggestion.level }}">
+                            <h6 class="text-{{ suggestion.level_color }}">
+                                <i class="bi bi-{{ suggestion.icon }}"></i> {{ suggestion.title }}
+                            </h6>
+                            <p class="mb-2">{{ suggestion.description }}</p>
+                            {% if suggestion.details %}
+                            <div class="bg-light p-3 rounded">
+                                <pre class="mb-0"><code>{{ suggestion.details }}</code></pre>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Memory Analysis -->
+        {% if memory_analysis %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-memory"></i> 内存使用分析
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for metric in memory_analysis.metrics %}
+                            <div class="col-md-3 mb-3">
+                                <div class="text-center">
+                                    <h6 class="text-muted">{{ metric.name }}</h6>
+                                    <h4 class="text-primary">{{ metric.value }}{{ metric.unit }}</h4>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container-fluid text-center">
+            <p class="mb-0">
+                <i class="bi bi-heart-fill text-danger"></i> 
+                由 性能医生 生成 | 
+                版本: {{ version }} | 
+                生成时间: {{ generation_time }}
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Prism.js -->
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <script>
+        // 资源详情切换
+        document.querySelectorAll('.toggle-details').forEach(button => {
+            button.addEventListener('click', function() {
+                const resourceId = this.getAttribute('data-resource-id');
+                const detailsRow = document.getElementById(`details-${resourceId}`);
+                const isVisible = detailsRow.classList.contains('show');
+                
+                // 收起所有详情
+                document.querySelectorAll('.resource-details').forEach(row => {
+                    row.classList.remove('show');
+                });
+                document.querySelectorAll('.toggle-details').forEach(btn => {
+                    btn.textContent = '查看详情';
+                });
+                
+                // 如果当前详情未显示，则显示
+                if (!isVisible) {
+                    detailsRow.classList.add('show');
+                    this.textContent = '收起详情';
+                }
+            });
+        });
+
+        // 过滤功能
+        document.querySelectorAll('.filter-badge').forEach(button => {
+            button.addEventListener('click', function() {
+                const filter = this.getAttribute('data-filter');
+                
+                // 更新按钮状态
+                document.querySelectorAll('.filter-badge').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                // 收起所有详情
+                document.querySelectorAll('.resource-details').forEach(row => {
+                    row.classList.remove('show');
+                });
+                document.querySelectorAll('.toggle-details').forEach(btn => {
+                    btn.textContent = '查看详情';
+                });
+                
+                // 过滤行
+                document.querySelectorAll('.resource-row').forEach(row => {
+                    const type = row.getAttribute('data-type');
+                    if (filter === 'all' || type === filter) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        // 搜索功能
+        document.getElementById('resourceSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            // 收起所有详情
+            document.querySelectorAll('.resource-details').forEach(row => {
+                row.classList.remove('show');
+            });
+            document.querySelectorAll('.toggle-details').forEach(btn => {
+                btn.textContent = '查看详情';
+            });
+            
+            // 搜索过滤
+            document.querySelectorAll('.resource-row').forEach(row => {
+                const url = row.getAttribute('data-url');
+                if (url.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // 语法高亮
+        Prism.highlightAll();
+    </script>
+</body>
+</html> 

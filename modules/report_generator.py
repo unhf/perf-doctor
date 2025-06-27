@@ -6,9 +6,19 @@
 
 import json
 import logging
-from typing import Dict, Any, List, Tuple
+import os
 from datetime import datetime
+from jinja2 import Template, Environment, FileSystemLoader
+import base64
+from typing import Dict, Any, List, Tuple
 from .network_report_generator import NetworkReportGenerator
+import sys
+
+from .collectors.performance_metrics_collector import PerformanceMetricsCollector
+from .collectors.memory_collector import MemoryCollector
+from .collectors.navigation_collector import NavigationCollector
+from .collectors.network_collector import NetworkCollector
+from .collectors.paint_collector import PaintCollector
 
 class ReportGenerator:
     """性能报告生成器"""
@@ -17,6 +27,29 @@ class ReportGenerator:
         """初始化报告生成器"""
         self.logger = logging.getLogger(__name__)
         self.network_report_generator = NetworkReportGenerator()
+        
+        # 初始化 Jinja2 环境，支持打包后的路径
+        try:
+            # 尝试从当前目录的 templates 文件夹加载
+            template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
+            if os.path.exists(template_dir):
+                self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
+            else:
+                # 打包后的路径：从可执行文件所在目录加载
+                if getattr(sys, 'frozen', False):
+                    # 打包后的路径
+                    base_path = sys._MEIPASS if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
+                    template_dir = os.path.join(base_path, 'templates')
+                else:
+                    # 开发环境路径
+                    template_dir = os.path.join(os.getcwd(), 'templates')
+                
+                self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
+                
+        except Exception as e:
+            self.logger.error(f"初始化 Jinja2 环境失败: {e}")
+            # 如果模板加载失败，使用字符串模板作为备选方案
+            self.jinja_env = None
         
         # 性能阈值配置（毫秒）
         self.thresholds = {
@@ -425,7 +458,9 @@ class ReportGenerator:
             "third_party_resources": [],
             "requests_by_type": {},
             "requests_by_domain": {},
-            "resources": []  # 添加资源列表
+            "resources": [],  # 添加资源列表
+            "api_count": 0,
+            "static_count": 0
         }
         
         try:
@@ -445,7 +480,27 @@ class ReportGenerator:
                         if url and url not in unique_resources:
                             unique_resources[url] = resource
                     resources = list(unique_resources.values())
-                    network_analysis["resources"] = resources
+                    
+                    # 格式化资源数据以适配模板
+                    formatted_resources = []
+                    for resource in resources:
+                        formatted_resource = {
+                            "url": resource.get("url", resource.get("name", "")),
+                            "method": resource.get("method", "GET"),
+                            "status": resource.get("status", 0),
+                            "status_class": "success" if resource.get("status", 0) < 400 else "error" if resource.get("status", 0) >= 500 else "warning",
+                            "size": self._format_size(resource.get("transferSize", 0)),
+                            "duration": int(resource.get("responseTime", 0)),
+                            "type": "API" if resource.get("isApi", False) else "Static" if resource.get("isStatic", False) else "Other",
+                            "type_color": "danger" if resource.get("isApi", False) else "success" if resource.get("isStatic", False) else "secondary",
+                            "request_headers": resource.get("requestHeaders", {}),
+                            "response_headers": resource.get("responseHeaders", {}),
+                            "request_body": resource.get("requestBody", ""),
+                            "response_body": resource.get("responseBody", "")
+                        }
+                        formatted_resources.append(formatted_resource)
+                    
+                    network_analysis["resources"] = formatted_resources
                     
                     # 使用去重后的资源分析结果重新计算所有统计信息
                     api_count = len([r for r in resources if r.get("isApi", False)])
@@ -461,6 +516,7 @@ class ReportGenerator:
                         requests_by_type[initiator_type] = requests_by_type.get(initiator_type, 0) + 1
                         domain = r.get("domain", "unknown")
                         requests_by_domain[domain] = requests_by_domain.get(domain, 0) + 1
+                    
                     network_analysis["summary"] = {
                         "total_requests": len(resources),
                         "total_size_mb": round(total_size / (1024 * 1024), 2),
@@ -469,6 +525,8 @@ class ReportGenerator:
                         "static_requests": static_count,
                         "third_party_requests": third_party_count
                     }
+                    network_analysis["api_count"] = api_count
+                    network_analysis["static_count"] = static_count
                     network_analysis["requests_by_type"] = requests_by_type
                     network_analysis["requests_by_domain"] = requests_by_domain
             
@@ -476,6 +534,19 @@ class ReportGenerator:
             self.logger.error(f"提取网络分析数据失败: {e}")
         
         return network_analysis
+    
+    def _format_size(self, size_bytes: int) -> str:
+        """格式化文件大小"""
+        if size_bytes == 0:
+            return "0 B"
+        
+        size_names = ["B", "KB", "MB", "GB"]
+        i = 0
+        while size_bytes >= 1024 and i < len(size_names) - 1:
+            size_bytes /= 1024.0
+            i += 1
+        
+        return f"{size_bytes:.1f} {size_names[i]}"
     
     def _format_resources(self, resources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """格式化资源数据，添加可读的大小和域名信息"""
@@ -757,480 +828,211 @@ URL: {report['url']}
             
             # 提取网络分析数据
             network_analysis = report.get("network_analysis", {})
-            summary = network_analysis.get("summary", {})
             
             # 提取性能指标
             key_metrics = report.get("key_metrics", {})
             scores = report.get("scores", {})
             recommendations = report.get("recommendations", [])
             
-            # 获取所有资源列表
-            all_resources = self._get_all_resources(network_analysis)
-            
-            # 生成各个部分
-            performance_metrics_section = self._generate_performance_metrics_section(key_metrics, scores)
-            network_section = self._generate_network_section(network_analysis)
-            resources_section = self._generate_all_resources_section(all_resources, network_analysis)
-            recommendations_section = self._generate_recommendations_section(recommendations)
-            
-            # CSS样式
-            css_styles = """
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                margin: 0;
-                padding: 0;
-                background: #f5f5f5;
-                color: #333;
-            }
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 20px;
-            }
-            header {
-                background: white;
-                padding: 30px;
-                border-radius: 10px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                margin-bottom: 20px;
-            }
-            header h1 {
-                margin: 0 0 20px 0;
-                color: #2c3e50;
-            }
-            .report-info {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-            }
-            .section {
-                background: white;
-                border-radius: 10px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                margin-bottom: 20px;
-                overflow: hidden;
-            }
-            .section-header {
-                background: #f8f9fa;
-                padding: 20px;
-                border-bottom: 1px solid #e9ecef;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            .section-header h2 {
-                margin: 0;
-                color: #2c3e50;
-            }
-            .section-content {
-                padding: 20px;
-            }
-            .stats-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 15px;
-                margin-bottom: 20px;
-            }
-            .stat-card {
-                background: #f8f9fa;
-                padding: 20px;
-                border-radius: 8px;
-                text-align: center;
-                border: 1px solid #e9ecef;
-            }
-            .stat-card .value {
-                font-size: 2em;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 5px;
-            }
-            .stat-card .label {
-                color: #6c757d;
-                font-size: 0.9em;
-            }
-            .metrics-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-            }
-            .metric-card {
-                background: #f8f9fa;
-                padding: 20px;
-                border-radius: 8px;
-                text-align: center;
-                border: 1px solid #e9ecef;
-            }
-            .metric-name {
-                font-weight: bold;
-                margin-bottom: 10px;
-                color: #2c3e50;
-            }
-            .metric-value {
-                font-size: 1.5em;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 5px;
-            }
-            .metric-score {
-                color: #6c757d;
-                font-size: 0.9em;
-            }
-            .score {
-                padding: 5px 10px;
-                border-radius: 15px;
-                font-weight: bold;
-            }
-            .score-good { background: #d4edda; color: #155724; }
-            .score-medium { background: #fff3cd; color: #856404; }
-            .score-poor { background: #f8d7da; color: #721c24; }
-            .recommendation-item {
-                background: #f8f9fa;
-                border-radius: 8px;
-                padding: 15px;
-                margin-bottom: 15px;
-                border-left: 4px solid #007bff;
-            }
-            .recommendation-priority {
-                display: inline-block;
-                padding: 3px 8px;
-                border-radius: 12px;
-                font-size: 0.8em;
-                font-weight: bold;
-                margin-bottom: 10px;
-            }
-            .priority-high { background: #f8d7da; color: #721c24; }
-            .priority-medium { background: #fff3cd; color: #856404; }
-            .priority-low { background: #d4edda; color: #155724; }
-            .recommendation-issue {
-                font-weight: bold;
-                margin-bottom: 10px;
-                color: #2c3e50;
-            }
-            .recommendation-suggestions {
-                margin: 0;
-                padding-left: 20px;
-            }
-            .recommendation-suggestions li {
-                margin-bottom: 5px;
-                color: #6c757d;
-            }
-            .summary-stats {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                gap: 15px;
-                margin-bottom: 20px;
-            }
-            .summary-stat {
-                background: #f8f9fa;
-                padding: 15px;
-                border-radius: 8px;
-                text-align: center;
-                border: 1px solid #e9ecef;
-            }
-            .summary-stat .number {
-                font-size: 1.5em;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 5px;
-            }
-            .summary-stat .label {
-                color: #6c757d;
-                font-size: 0.9em;
-            }
-            .filter-controls {
-                margin-bottom: 20px;
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-                align-items: center;
-            }
-            .search-box {
-                padding: 8px 12px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 14px;
-                min-width: 200px;
-            }
-            .filter-btn {
-                padding: 8px 16px;
-                border: 1px solid #ddd;
-                background: white;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-            }
-            .filter-btn.active {
-                background: #007bff;
-                color: white;
-                border-color: #007bff;
-            }
-            .resource-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-            }
-            .resource-table th,
-            .resource-table td {
-                padding: 12px;
-                text-align: left;
-                border-bottom: 1px solid #e9ecef;
-            }
-            .resource-table th {
-                background: #f8f9fa;
-                font-weight: 600;
-                color: #2c3e50;
-            }
-            .resource-table tr:hover {
-                background: #f8f9fa;
-            }
-            .method-badge {
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 0.8em;
-                font-weight: 500;
-            }
-            .method-get { background: #e8f5e8; color: #2e7d32; }
-            .method-post { background: #fff3e0; color: #f57c00; }
-            .method-put { background: #e3f2fd; color: #1976d2; }
-            .method-delete { background: #ffebee; color: #c62828; }
-            .status-badge {
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 0.8em;
-                font-weight: 500;
-            }
-            .status-2xx { background: #e8f5e8; color: #2e7d32; }
-            .status-3xx { background: #fff3e0; color: #f57c00; }
-            .status-4xx { background: #ffebee; color: #c62828; }
-            .status-5xx { background: #ffebee; color: #c62828; }
-            .category-badge {
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 0.8em;
-                font-weight: 500;
-            }
-            .category-api { background: #e3f2fd; color: #1976d2; }
-            .category-static { background: #e8f5e8; color: #2e7d32; }
-            .category-third-party { background: #fff3e0; color: #f57c00; }
-            .category-other { background: #f3e5f5; color: #7b1fa2; }
-            .details-btn {
-                background: #667eea;
-                color: white;
-                border: none;
-                padding: 4px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.8em;
-            }
-            .details-btn:hover {
-                background: #5a6fd8;
-            }
-            .details-content {
-                background: #f8f9fa;
-                border: 1px solid #e9ecef;
-                border-radius: 8px;
-                padding: 15px;
-                margin: 10px 0;
-            }
-            .details-section {
-                margin-bottom: 15px;
-            }
-            .details-section h4 {
-                margin: 0 0 8px 0;
-                color: #333;
-                font-size: 0.9em;
-            }
-            .details-content pre {
-                background: #fff;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-                margin: 0;
-                font-size: 0.8em;
-                max-height: 200px;
-                overflow-y: auto;
-                white-space: pre-wrap;
-                word-break: break-all;
-            }
-            .details-content .headers {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-            }
-            .details-content .header-item {
-                background: #fff;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-                font-size: 0.8em;
-            }
-            .details-content .header-name {
-                font-weight: 600;
-                color: #333;
-            }
-            .details-content .header-value {
-                color: #666;
-                word-break: break-all;
-            }
-            .debug-section {
-                background: #f5f5f5;
-                padding: 15px;
-                margin: 15px 0;
-                border-radius: 5px;
-                border-left: 4px solid #007bff;
-            }
-            """
-            
-            # JavaScript代码
-            javascript_code = """
-            function searchResources() {
-                const input = document.getElementById('searchInput');
-                const filter = input.value.toLowerCase();
-                const rows = document.querySelectorAll('.resource-row');
-                const detailsRows = document.querySelectorAll('.details-row');
+            # 准备模板数据
+            template_data = {
+                "report_title": f"性能分析报告 - {url}",
+                "url": url,
+                "analysis_time": timestamp,
+                "generation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "version": "1.0.0",
+                "total_duration": int(report.get("load_time", 0)),
                 
-                // 收起所有展开的详情行
-                detailsRows.forEach(detailsRow => {
-                    detailsRow.style.display = 'none';
-                });
-                
-                // 重置所有"查看详情"按钮的文本
-                const detailBtns = document.querySelectorAll('.details-btn');
-                detailBtns.forEach(btn => {
-                    btn.textContent = '查看详情';
-                });
-                
-                rows.forEach(row => {
-                    const url = row.querySelector('td:nth-child(8)').textContent.toLowerCase();
-                    const domain = row.querySelector('td:nth-child(1)').textContent.toLowerCase();
-                    const method = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
-                    
-                    if (url.includes(filter) || domain.includes(filter) || method.includes(filter)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
+                # 关键指标卡片
+                "key_metrics": [
+                    {
+                        "name": "首屏绘制",
+                        "value": f"{key_metrics.get('fcp', 0):.0f}",
+                        "unit": "ms",
+                        "icon": "bi-speedometer2"
+                    },
+                    {
+                        "name": "最大内容绘制",
+                        "value": f"{key_metrics.get('lcp', 0):.0f}",
+                        "unit": "ms",
+                        "icon": "bi-display"
+                    },
+                    {
+                        "name": "首次字节",
+                        "value": f"{key_metrics.get('ttfb', 0):.0f}",
+                        "unit": "ms",
+                        "icon": "bi-clock"
+                    },
+                    {
+                        "name": "综合评分",
+                        "value": f"{overall_score:.0f}",
+                        "unit": "分",
+                        "icon": "bi-star-fill"
                     }
-                });
-            }
-            
-            function filterResources(category) {
-                const rows = document.querySelectorAll('.resource-row');
-                const buttons = document.querySelectorAll('.filter-btn');
-                const detailsRows = document.querySelectorAll('.details-row');
+                ],
                 
-                // 更新按钮状态
-                buttons.forEach(btn => btn.classList.remove('active'));
-                event.target.classList.add('active');
+                # 性能指标详情
+                "performance_metrics": {
+                    "页面加载": [
+                        {"name": "DOM就绪", "value": f"{key_metrics.get('dom_ready', 0):.0f}", "unit": "ms"},
+                        {"name": "页面加载", "value": f"{key_metrics.get('page_load', 0):.0f}", "unit": "ms"},
+                        {"name": "DNS查询", "value": f"{key_metrics.get('dns_lookup', 0):.0f}", "unit": "ms"},
+                        {"name": "TCP连接", "value": f"{key_metrics.get('tcp_connect', 0):.0f}", "unit": "ms"}
+                    ],
+                    "网络请求": [
+                        {"name": "总请求数", "value": f"{key_metrics.get('total_requests', 0)}", "unit": ""},
+                        {"name": "API请求数", "value": f"{key_metrics.get('api_requests', 0)}", "unit": ""},
+                        {"name": "第三方请求", "value": f"{key_metrics.get('third_party_requests', 0)}", "unit": ""},
+                        {"name": "平均响应时间", "value": f"{key_metrics.get('avg_response_time', 0):.0f}", "unit": "ms"}
+                    ]
+                },
                 
-                // 先收起所有展开的详情行
-                detailsRows.forEach(detailsRow => {
-                    detailsRow.style.display = 'none';
-                });
+                # 网络分析
+                "network_analysis": network_analysis,
                 
-                // 重置所有"查看详情"按钮的文本
-                const detailBtns = document.querySelectorAll('.details-btn');
-                detailBtns.forEach(btn => {
-                    btn.textContent = '查看详情';
-                });
-                
-                rows.forEach(row => {
-                    const rowCategory = row.getAttribute('data-category');
-                    if (category === 'all' || rowCategory === category) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
+                # 优化建议
+                "optimization_suggestions": [
+                    {
+                        "title": rec.get("title", "优化建议"),
+                        "description": rec.get("description", ""),
+                        "level": rec.get("level", "info"),
+                        "level_color": "info" if rec.get("level") == "info" else "warning" if rec.get("level") == "warning" else "danger",
+                        "icon": "info-circle" if rec.get("level") == "info" else "exclamation-triangle" if rec.get("level") == "warning" else "exclamation-circle",
+                        "details": rec.get("details", "")
                     }
-                });
+                    for rec in recommendations
+                ],
+                
+                # 内存分析
+                "memory_analysis": {
+                    "metrics": [
+                        {"name": "已用内存", "value": f"{key_metrics.get('memory_used', 0) / 1024 / 1024:.1f}", "unit": "MB"},
+                        {"name": "总内存", "value": f"{key_metrics.get('memory_total', 0) / 1024 / 1024:.1f}", "unit": "MB"},
+                        {"name": "内存限制", "value": f"{key_metrics.get('memory_limit', 0) / 1024 / 1024:.1f}", "unit": "MB"},
+                        {"name": "内存使用率", "value": f"{(key_metrics.get('memory_used', 0) / key_metrics.get('memory_limit', 1)) * 100:.1f}", "unit": "%"}
+                    ]
+                } if key_metrics.get('memory_used') else None
             }
             
-            function sortTable(columnIndex) {
-                const table = document.querySelector('.resource-table');
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr:not(.details-row)'));
-                
-                rows.sort((a, b) => {
-                    const aValue = a.cells[columnIndex].textContent;
-                    const bValue = b.cells[columnIndex].textContent;
-                    
-                    // 数字排序
-                    if (!isNaN(aValue) && !isNaN(bValue)) {
-                        return parseFloat(aValue) - parseFloat(bValue);
-                    }
-                    
-                    // 字符串排序
-                    return aValue.localeCompare(bValue);
-                });
-                
-                // 重新插入排序后的行
-                rows.forEach(row => {
-                    tbody.appendChild(row);
-                    // 同时移动对应的详情行
-                    const index = row.querySelector('.details-btn').getAttribute('onclick').match(/\d+/)[0];
-                    const detailsRow = document.getElementById('details-' + index);
-                    if (detailsRow) {
-                        tbody.appendChild(detailsRow);
-                    }
-                });
-            }
-            
-            function toggleDetails(index) {
-                const detailsRow = document.getElementById('details-' + index);
-                const btn = event.target;
-                
-                if (detailsRow.style.display === 'none') {
-                    detailsRow.style.display = 'table-row';
-                    btn.textContent = '隐藏详情';
-                } else {
-                    detailsRow.style.display = 'none';
-                    btn.textContent = '查看详情';
-                }
-            }
-            """
-            
-            # 组合完整的HTML报告
-            html = f"""
-            <!DOCTYPE html>
-            <html lang="zh-CN">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>性能分析报告 - {report['url']}</title>
-                <style>
-                    {css_styles}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <header>
-                        <h1>🔍 Chrome Performance Doctor 分析报告</h1>
-                        <div class="report-info">
-                            <div><strong>URL:</strong> {report['url']}</div>
-                            <div><strong>测试时间:</strong> {report['test_date']}</div>
-                            <div><strong>总体评分:</strong> <span class="score {self._get_score_class(report['overall_score'])}">{report['overall_score']:.1f}/100</span></div>
-                        </div>
-                    </header>
-                    
-                    {performance_metrics_section}
-                    
-                    {network_section}
-                    
-                    {resources_section}
-                    
-                    {recommendations_section}
-                </div>
-                
-                <script>
-                    {javascript_code}
-                </script>
-            </body>
-            </html>
-            """
-            
-            return html
+            # 使用 Jinja2 模板生成完整的 HTML 报告
+            if self.jinja_env:
+                try:
+                    template = self.jinja_env.get_template('report_template.html')
+                    html = template.render(**template_data)
+                    return html
+                except Exception as e:
+                    self.logger.error(f"模板渲染失败: {e}")
+                    # 如果模板渲染失败，使用备选方案
+                    return self._generate_fallback_html(template_data)
+            else:
+                # 如果 Jinja2 环境未初始化，使用备选方案
+                return self._generate_fallback_html(template_data)
             
         except Exception as e:
             self.logger.error(f"生成完整HTML报告失败: {e}")
             return f"<html><body><h1>报告生成失败</h1><p>错误: {e}</p></body></html>"
+    
+    def _generate_fallback_html(self, data: Dict[str, Any]) -> str:
+        """生成备选的简单 HTML 报告"""
+        # 生成关键指标卡片
+        metrics_html = ""
+        for metric in data['key_metrics']:
+            metrics_html += f"""
+            <div class="col-md-3 mb-3">
+                <div class="card metric-card h-100">
+                    <div class="card-body text-center">
+                        <h5>{metric['name']}</h5>
+                        <h3 class="text-primary">{metric['value']}</h3>
+                        <small class="text-muted">{metric['unit']}</small>
+                    </div>
+                </div>
+            </div>
+            """
+        
+        # 生成网络分析部分
+        network_html = ""
+        if data.get('network_analysis'):
+            network_html = f"""
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>网络请求分析</h5>
+            </div>
+            <div class="card-body">
+                <p>API 请求: {data['network_analysis'].get('api_count', 0)} 个</p>
+                <p>静态资源: {data['network_analysis'].get('static_count', 0)} 个</p>
+            </div>
+        </div>
+        """
+        
+        # 生成优化建议部分
+        suggestions_html = ""
+        if data.get('optimization_suggestions'):
+            suggestions_content = ""
+            for suggestion in data['optimization_suggestions']:
+                suggestions_content += f"""
+                <div class="mb-3">
+                    <h6>{suggestion['title']}</h6>
+                    <p>{suggestion['description']}</p>
+                </div>
+                """
+            
+            suggestions_html = f"""
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>优化建议 ({len(data['optimization_suggestions'])}条)</h5>
+            </div>
+            <div class="card-body">
+                {suggestions_content}
+            </div>
+        </div>
+        """
+        
+        # 组装完整的 HTML
+        html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{data['report_title']}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .metric-card {{ transition: transform 0.2s; }}
+        .metric-card:hover {{ transform: translateY(-2px); }}
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand">性能医生</span>
+            <span class="navbar-text">分析时间: {data['analysis_time']}</span>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h1 class="text-primary">性能分析报告</h1>
+                <p class="text-muted">网站: {data['url']} | 总耗时: {data['total_duration']}ms</p>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            {metrics_html}
+        </div>
+
+        {network_html}
+        {suggestions_html}
+    </div>
+
+    <footer class="bg-dark text-light py-3 mt-5">
+        <div class="container text-center">
+            <p class="mb-0">由 性能医生 生成 | 版本: {data['version']} | 生成时间: {data['generation_time']}</p>
+        </div>
+    </footer>
+</body>
+</html>"""
+        
+        return html
     
     def _get_score_class(self, score: float) -> str:
         """获取评分对应的CSS类"""
@@ -1270,74 +1072,21 @@ URL: {report['url']}
         if not key_metrics:
             return ""
         
-        html = """
-        <div class="section">
-            <div class="section-header">
-                <h2>📊 性能指标详情</h2>
-            </div>
-            <div class="section-content">
-                <div class="metrics-grid">
-        """
-        
-        for metric_name, value in key_metrics.items():
-            if metric_name in scores:
-                score_info = scores[metric_name]
-                rating_emoji = {"good": "✅", "needs_improvement": "⚠️", "poor": "❌"}
-                emoji = rating_emoji.get(score_info["rating"], "❓")
-                
-                html += f"""
-                    <div class="metric-card">
-                        <div class="metric-name">{emoji} {metric_name.upper()}</div>
-                        <div class="metric-value">{value:.0f} ms</div>
-                        <div class="metric-score">评分: {score_info['score']:.1f}/100</div>
-                    </div>
-                """
-        
-        html += """
-                </div>
-            </div>
-        </div>
-        """
-        
-        return html
+        template = self.jinja_env.get_template('performance_metrics_section.html')
+        return template.render(
+            key_metrics=key_metrics,
+            scores=scores
+        )
     
     def _generate_recommendations_section(self, recommendations: List[Dict[str, Any]]) -> str:
         """生成优化建议部分"""
         if not recommendations:
             return ""
         
-        html = f"""
-        <div class="section">
-            <div class="section-header">
-                <h2>💡 优化建议</h2>
-                <div class="count">{len(recommendations)} 条建议</div>
-            </div>
-            <div class="section-content">
-        """
-        
-        for rec in recommendations:
-            priority_class = f"priority-{rec['priority']}"
-            html += f"""
-                <div class="recommendation-item">
-                    <span class="recommendation-priority {priority_class}">{rec['priority'].upper()}</span>
-                    <div class="recommendation-issue">{rec['issue']}</div>
-                    <ul class="recommendation-suggestions">
-            """
-            
-            for suggestion in rec["suggestions"]:
-                html += f"<li>{suggestion}</li>"
-            
-            html += """
-                    </ul>
-                </div>
-            """
-        
-        html += """
-            </div>
-        </div>
-        """
-        
-        return html
+        template = self.jinja_env.get_template('recommendations_section.html')
+        return template.render(
+            recommendations=recommendations
+        )
     
     def _generate_all_resources_section(self, all_resources: List[Dict[str, Any]], network_analysis: Dict[str, Any]) -> str:
         """生成所有资源请求详细信息部分"""
@@ -1350,323 +1099,14 @@ URL: {report['url']}
         third_party_resources = [r for r in all_resources if r.get("isThirdParty", False)]
         other_resources = [r for r in all_resources if not r.get("isApi", False) and not r.get("isStatic", False) and not r.get("isThirdParty", False)]
         
-        html = f"""
-        <div class="section">
-            <div class="section-header">
-                <h2>📋 所有资源请求详细信息 ({len(all_resources)} 个)</h2>
-            </div>
-            <div class="section-content">
-                <div class="summary-stats">
-                    <div class="summary-stat">
-                        <div class="number">{len(api_resources)}</div>
-                        <div class="label">API请求</div>
-                    </div>
-                    <div class="summary-stat">
-                        <div class="number">{len(static_resources)}</div>
-                        <div class="label">静态资源</div>
-                    </div>
-                    <div class="summary-stat">
-                        <div class="number">{len(third_party_resources)}</div>
-                        <div class="label">第三方资源</div>
-                    </div>
-                    <div class="summary-stat">
-                        <div class="number">{len(other_resources)}</div>
-                        <div class="label">其他资源</div>
-                    </div>
-                </div>
-                
-                <!-- 调试信息：API资源列表 -->
-                <div class="debug-section" style="background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff;">
-                    <h4>🔍 调试信息：API资源详情 ({len(api_resources)} 个)</h4>
-                    <div style="font-size: 12px; color: #666;">
-                        <strong>统计卡片显示API数：</strong>{network_analysis.get("summary", {}).get("api_requests", 0)}<br>
-                        <strong>实际API资源数：</strong>{len(api_resources)}<br>
-                        <strong>API资源列表：</strong>
-                    </div>
-                    <div style="max-height: 200px; overflow-y: auto; background: white; padding: 10px; margin-top: 10px; border-radius: 3px;">
-        """
-        
-        for i, resource in enumerate(api_resources):
-            html += f"""
-                        <div style="margin-bottom: 5px; padding: 5px; border-bottom: 1px solid #eee;">
-                            <strong>{i+1}.</strong> {resource.get('url', 'Unknown URL')}<br>
-                            <span style="color: #666;">域名: {resource.get('domain', 'Unknown')} | 方法: {resource.get('method', 'GET')} | 状态: {resource.get('status', 0)}</span>
-                        </div>
-            """
-        
-        html += """
-                    </div>
-                </div>
-                
-                <div class="filter-controls">
-                    <input type="text" id="searchInput" class="search-box" placeholder="搜索资源..." onkeyup="searchResources()">
-                    <button class="filter-btn active" onclick="filterResources('all')">全部</button>
-                    <button class="filter-btn" onclick="filterResources('API')">API</button>
-                    <button class="filter-btn" onclick="filterResources('Static')">静态资源</button>
-                    <button class="filter-btn" onclick="filterResources('Third-party')">第三方</button>
-                    <button class="filter-btn" onclick="filterResources('Other')">其他</button>
-                </div>
-                
-                <table class="resource-table">
-                    <thead>
-                        <tr>
-                            <th onclick="sortTable(0)" style="cursor: pointer;">域名</th>
-                            <th onclick="sortTable(1)" style="cursor: pointer;">方法</th>
-                            <th onclick="sortTable(2)" style="cursor: pointer;">状态码</th>
-                            <th onclick="sortTable(3)" style="cursor: pointer;">大小 (KB)</th>
-                            <th onclick="sortTable(4)" style="cursor: pointer;">响应时间 (ms)</th>
-                            <th onclick="sortTable(5)" style="cursor: pointer;">类型</th>
-                            <th onclick="sortTable(6)" style="cursor: pointer;">分类</th>
-                            <th>URL</th>
-                            <th>详细信息</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        for i, resource in enumerate(all_resources):
-            # 确定资源分类
-            if resource.get("isApi", False):
-                category = "API"
-                category_class = "category-api"
-            elif resource.get("isStatic", False):
-                category = "Static"
-                category_class = "category-static"
-            elif resource.get("isThirdParty", False):
-                category = "Third-party"
-                category_class = "category-third-party"
-            else:
-                category = "Other"
-                category_class = "category-other"
-            
-            # 提取详细信息
-            method = resource.get("method", "GET")
-            status = resource.get("status", 0)
-            size_kb = resource.get("transferSize", 0) / 1024
-            response_time = resource.get("responseTime", 0)
-            mime_type = resource.get("mimeType", "")
-            url = resource.get("url", resource.get("name", ""))
-            domain = resource.get("domain", "")
-            
-            # 准备详细信息内容
-            request_headers = resource.get("requestHeaders", {})
-            response_headers = resource.get("responseHeaders", {})
-            request_body = resource.get("requestBody", "")
-            response_body = resource.get("responseBody", "")
-            
-            # 生成详细信息HTML
-            details_html = self._generate_resource_details_html(
-                i, method, status, mime_type, request_headers, response_headers, 
-                request_body, response_body, url
-            )
-            
-            html += f"""
-                        <tr class="resource-row" data-category="{category}">
-                            <td><strong>{domain}</strong></td>
-                            <td><span class="method-badge method-{method.lower()}">{method}</span></td>
-                            <td><span class="status-badge status-{status//100}xx">{status}</span></td>
-                            <td>{size_kb:.1f}</td>
-                            <td>{response_time:.0f}</td>
-                            <td>{mime_type}</td>
-                            <td><span class="category-badge {category_class}">{category}</span></td>
-                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{url}">
-                                {url}
-                            </td>
-                            <td>
-                                <button class="details-btn" onclick="toggleDetails({i})">查看详情</button>
-                            </td>
-                        </tr>
-                        <tr class="details-row" id="details-{i}" style="display: none;">
-                            <td colspan="9">
-                                {details_html}
-                            </td>
-                        </tr>
-            """
-        
-        html += """
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <style>
-        .method-badge {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: 500;
-        }
-        .method-get { background: #e8f5e8; color: #2e7d32; }
-        .method-post { background: #fff3e0; color: #f57c00; }
-        .method-put { background: #e3f2fd; color: #1976d2; }
-        .method-delete { background: #ffebee; color: #c62828; }
-        
-        .status-badge {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: 500;
-        }
-        .status-2xx { background: #e8f5e8; color: #2e7d32; }
-        .status-3xx { background: #fff3e0; color: #f57c00; }
-        .status-4xx { background: #ffebee; color: #c62828; }
-        .status-5xx { background: #ffebee; color: #c62828; }
-        
-        .details-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8em;
-        }
-        .details-btn:hover {
-            background: #5a6fd8;
-        }
-        
-        .details-content {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        
-        .details-section {
-            margin-bottom: 15px;
-        }
-        
-        .details-section h4 {
-            margin: 0 0 8px 0;
-            color: #333;
-            font-size: 0.9em;
-        }
-        
-        .details-content pre {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 8px;
-            margin: 0;
-            font-size: 0.8em;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        
-        .details-content .headers {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-        
-        .details-content .header-item {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 8px;
-            font-size: 0.8em;
-        }
-        
-        .details-content .header-name {
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .details-content .header-value {
-            color: #666;
-            word-break: break-all;
-        }
-        </style>
-        
-        <script>
-        function toggleDetails(index) {
-            const detailsRow = document.getElementById('details-' + index);
-            const btn = event.target;
-            
-            if (detailsRow.style.display === 'none') {
-                detailsRow.style.display = 'table-row';
-                btn.textContent = '隐藏详情';
-            } else {
-                detailsRow.style.display = 'none';
-                btn.textContent = '查看详情';
-            }
-        }
-        </script>
-        """
-        
-        return html
-    
-    def _generate_resource_details_html(self, index: int, method: str, status: int, 
-                                       mime_type: str, request_headers: Dict, response_headers: Dict,
-                                       request_body: str, response_body: str, url: str) -> str:
-        """生成资源详细信息HTML"""
-        
-        html = f"""
-        <div class="details-content">
-            <div class="details-section">
-                <h4>🔗 请求信息</h4>
-                <div><strong>URL:</strong> {url}</div>
-                <div><strong>方法:</strong> {method}</div>
-                <div><strong>状态码:</strong> {status}</div>
-                <div><strong>MIME类型:</strong> {mime_type}</div>
-            </div>
-        """
-        
-        # 请求头
-        if request_headers:
-            html += """
-            <div class="details-section">
-                <h4>📤 请求头</h4>
-                <div class="headers">
-            """
-            for name, value in request_headers.items():
-                html += f"""
-                    <div class="header-item">
-                        <div class="header-name">{name}</div>
-                        <div class="header-value">{value}</div>
-                    </div>
-                """
-            html += "</div></div>"
-        
-        # 响应头
-        if response_headers:
-            html += """
-            <div class="details-section">
-                <h4>📥 响应头</h4>
-                <div class="headers">
-            """
-            for name, value in response_headers.items():
-                html += f"""
-                    <div class="header-item">
-                        <div class="header-name">{name}</div>
-                        <div class="header-value">{value}</div>
-                    </div>
-                """
-            html += "</div></div>"
-        
-        # 请求体
-        if request_body:
-            html += f"""
-            <div class="details-section">
-                <h4>📤 请求体</h4>
-                <pre>{request_body}</pre>
-            </div>
-            """
-        
-        # 响应体
-        if response_body:
-            html += f"""
-            <div class="details-section">
-                <h4>📥 响应体</h4>
-                <pre>{response_body}</pre>
-            </div>
-            """
-        
-        html += "</div>"
-        return html
+        template = self.jinja_env.get_template('all_resources_section.html')
+        return template.render(
+            api_resources=api_resources,
+            static_resources=static_resources,
+            third_party_resources=third_party_resources,
+            other_resources=other_resources,
+            network_analysis=network_analysis
+        )
     
     def _generate_network_section(self, network_analysis: Dict[str, Any]) -> str:
         """生成网络分析部分"""
@@ -1675,40 +1115,7 @@ URL: {report['url']}
         
         summary = network_analysis["summary"]
         
-        html = f"""
-        <div class="section">
-            <div class="section-header">
-                <h2>🌐 网络请求分析</h2>
-            </div>
-            <div class="section-content">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="value">{summary.get('total_requests', 0)}</div>
-                        <div class="label">总请求数</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{summary.get('total_size_mb', 0)} MB</div>
-                        <div class="label">总资源大小</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{summary.get('avg_response_time', 0)} ms</div>
-                        <div class="label">平均响应时间</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{summary.get('api_requests', 0)}</div>
-                        <div class="label">API请求数</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{summary.get('third_party_requests', 0)}</div>
-                        <div class="label">第三方请求数</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="value">{len(network_analysis.get('large_resources', []))}</div>
-                        <div class="label">大资源文件</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-        
-        return html
+        template = self.jinja_env.get_template('network_section.html')
+        return template.render(
+            summary=summary
+        )
