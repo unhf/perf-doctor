@@ -65,19 +65,22 @@ def show_help():
     ✅ 自动继承 Chrome 登录状态，免登录分析业务页面
     ✅ 自动启动 Chrome 调试实例
     ✅ 收集完整的性能指标（FCP、LCP、TTFB 等）
-    ✅ 生成详细的性能分析报告
+    ✅ 生成详细的HTML性能分析报告
     ✅ 支持批量页面分析
     ✅ 识别性能瓶颈并提供优化建议
+    ✅ 完整的网络请求分析（API、静态资源、第三方）
 
 报告输出:
     • 终端显示概要信息和关键指标
-    • JSON 格式详细报告保存到 reports/ 目录
-    • 包含具体的优化建议和改进措施
+    • 完整HTML报告保存到 reports/ 目录
+    • 包含所有资源请求列表和优化建议
+    • 支持搜索、过滤和排序功能
 
 技术实现:
     • 通过 Chrome DevTools Protocol 收集性能数据
     • 自动复制主 Chrome 的登录信息到调试实例
     • 支持复杂业务页面的深度性能分析
+    • 生成交互式HTML报告
 """
     print(help_text)
 
@@ -192,7 +195,7 @@ async def main():
         
         # 保存报告
         if REPORT_CONFIG["save_json"] or REPORT_CONFIG["save_text"]:
-            print(f"\n💾 保存报告到: {REPORT_CONFIG['output_dir']}")
+            print(f"\n💾 保存HTML报告到: {REPORT_CONFIG['output_dir']}")
             doctor.save_reports(results, REPORT_CONFIG["output_dir"])
         
         print(f"\n✅ 分析完成!")

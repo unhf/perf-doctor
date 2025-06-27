@@ -5,9 +5,9 @@ name = "pypi"
 
 [packages]
 websockets = "==12.0"
-requests = "==2.31.0"
 psutil = "==5.9.8"
 pyinstaller = "*"
+requests = "*"
 
 [dev-packages]
 

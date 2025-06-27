@@ -234,7 +234,7 @@ class PerformanceDoctor:
     
     def save_reports(self, reports: List[Dict[str, Any]], output_dir: str = "reports"):
         """
-        保存所有报告到文件
+        保存所有报告到文件（只生成完整HTML报告）
         
         Args:
             reports: 报告列表
@@ -248,25 +248,20 @@ class PerformanceDoctor:
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # 保存单页面报告
+        # 只保存完整HTML报告
         for i, report in enumerate(reports):
             if report.get("success", True):
-                filename = f"report_{i+1}_{timestamp}.json"
-                filepath = os.path.join(output_dir, filename)
-                self.report_generator.save_report(report, filepath, "json")
-                
-                # 同时保存文本格式
-                txt_filename = f"report_{i+1}_{timestamp}.txt"
-                txt_filepath = os.path.join(output_dir, txt_filename)
-                self.report_generator.save_report(report, txt_filepath, "txt")
+                html_filename = f"report_{i+1}_{timestamp}.html"
+                html_filepath = os.path.join(output_dir, html_filename)
+                self.report_generator.save_full_html_report(report, html_filepath)
         
-        # 保存汇总报告
+        # 保存汇总报告（多页面时）
         if len(reports) > 1:
             summary = self.generate_summary_report(reports)
-            summary_filepath = os.path.join(output_dir, f"summary_{timestamp}.json")
-            self.report_generator.save_report(summary, summary_filepath, "json")
+            summary_html_filepath = os.path.join(output_dir, f"summary_{timestamp}.html")
+            self.report_generator.save_full_html_report(summary, summary_html_filepath)
         
-        self.logger.info(f"所有报告已保存到: {output_dir}")
+        self.logger.info(f"所有HTML报告已保存到: {output_dir}")
     
     def cleanup(self):
         """清理资源"""
