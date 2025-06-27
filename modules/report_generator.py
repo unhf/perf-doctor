@@ -436,59 +436,31 @@ class ReportGenerator:
                 if "data" in performance_data and "NetworkCollector" in performance_data["data"]:
                     network_data = performance_data["data"]["NetworkCollector"].get("data", {})
                     
-                    # 提取统计摘要
-                    stats = network_data.get("statistics", {})
-                    network_analysis["summary"] = {
-                        "total_requests": stats.get("totalRequests", 0),
-                        "total_size_mb": round(stats.get("totalSize", 0) / (1024 * 1024), 2),
-                        "avg_response_time": round(stats.get("avgResponseTime", 0), 2),
-                        "api_requests": stats.get("apiRequests", 0),
-                        "static_requests": stats.get("staticRequests", 0),
-                        "third_party_requests": stats.get("thirdPartyRequests", 0)
-                    }
-                    
-                    # 提取详细分析数据
-                    analysis = network_data.get("analysis", {})
-                    network_analysis["large_resources"] = self._format_resources(
-                        analysis.get("large_resources", [])
-                    )
-                    network_analysis["slow_requests"] = self._format_resources(
-                        analysis.get("slow_requests", [])
-                    )
-                    network_analysis["api_requests"] = self._format_resources(
-                        analysis.get("api_requests", [])
-                    )
-                    network_analysis["third_party_resources"] = self._format_resources(
-                        analysis.get("third_party_resources", [])
-                    )
-                    
                     # 提取所有资源数据（增强版）
                     resources = network_data.get("resources", [])
+                    # 去重
+                    unique_resources = {}
+                    for resource in resources:
+                        url = resource.get("url", resource.get("name", ""))
+                        if url and url not in unique_resources:
+                            unique_resources[url] = resource
+                    resources = list(unique_resources.values())
                     network_analysis["resources"] = resources
                     
-                    # 使用增强的资源分析结果重新计算所有统计信息
+                    # 使用去重后的资源分析结果重新计算所有统计信息
                     api_count = len([r for r in resources if r.get("isApi", False)])
                     static_count = len([r for r in resources if r.get("isStatic", False)])
                     third_party_count = len([r for r in resources if r.get("isThirdParty", False)])
-                    
-                    # 计算总大小和平均响应时间
                     total_size = sum(r.get("transferSize", 0) for r in resources)
                     response_times = [r.get("responseTime", 0) for r in resources if r.get("responseTime", 0) > 0]
                     avg_response_time = sum(response_times) / len(response_times) if response_times else 0
-                    
-                    # 按类型和域名统计
                     requests_by_type = {}
                     requests_by_domain = {}
                     for r in resources:
-                        # 按类型统计
                         initiator_type = r.get("initiatorType", "unknown")
                         requests_by_type[initiator_type] = requests_by_type.get(initiator_type, 0) + 1
-                        
-                        # 按域名统计
                         domain = r.get("domain", "unknown")
                         requests_by_domain[domain] = requests_by_domain.get(domain, 0) + 1
-                    
-                    # 更新统计摘要，完全使用增强分析结果
                     network_analysis["summary"] = {
                         "total_requests": len(resources),
                         "total_size_mb": round(total_size / (1024 * 1024), 2),
@@ -497,8 +469,6 @@ class ReportGenerator:
                         "static_requests": static_count,
                         "third_party_requests": third_party_count
                     }
-                    
-                    # 更新请求类型和域名统计
                     network_analysis["requests_by_type"] = requests_by_type
                     network_analysis["requests_by_domain"] = requests_by_domain
             
@@ -797,483 +767,464 @@ URL: {report['url']}
             # 获取所有资源列表
             all_resources = self._get_all_resources(network_analysis)
             
-            html = f"""
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>完整性能分析报告 - {url}</title>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f5f5f5;
-        }}
-        
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }}
-        
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            text-align: center;
-        }}
-        
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }}
-        
-        .header .url {{
-            font-size: 1.2em;
-            opacity: 0.9;
-            word-break: break-all;
-        }}
-        
-        .score-display {{
-            font-size: 3em;
-            font-weight: bold;
-            margin: 20px 0;
-        }}
-        
-        .score-good {{ color: #4caf50; }}
-        .score-medium {{ color: #ff9800; }}
-        .score-poor {{ color: #f44336; }}
-        
-        .stats-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-        
-        .stat-card {{
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        
-        .stat-card .value {{
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 10px;
-        }}
-        
-        .stat-card .label {{
-            color: #666;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }}
-        
-        .section {{
-            background: white;
-            margin-bottom: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }}
-        
-        .section-header {{
-            background: #f8f9fa;
-            padding: 20px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-        
-        .section-header h2 {{
-            color: #333;
-            font-size: 1.5em;
-        }}
-        
-        .section-header .count {{
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.9em;
-        }}
-        
-        .section-content {{
-            padding: 20px;
-        }}
-        
-        .metrics-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }}
-        
-        .metric-card {{
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }}
-        
-        .metric-name {{
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-        }}
-        
-        .metric-value {{
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-        }}
-        
-        .metric-score {{
-            font-size: 0.9em;
-            color: #666;
-            margin-top: 5px;
-        }}
-        
-        .resource-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 0.9em;
-        }}
-        
-        .resource-table th,
-        .resource-table td {{
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-        }}
-        
-        .resource-table th {{
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #333;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }}
-        
-        .resource-table tr:hover {{
-            background: #f8f9fa;
-        }}
-        
-        .category-badge {{
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: 500;
-        }}
-        
-        .category-api {{
-            background: #e3f2fd;
-            color: #1976d2;
-        }}
-        
-        .category-static {{
-            background: #f3e5f5;
-            color: #7b1fa2;
-        }}
-        
-        .category-third-party {{
-            background: #fff3e0;
-            color: #f57c00;
-        }}
-        
-        .category-other {{
-            background: #f1f8e9;
-            color: #388e3c;
-        }}
-        
-        .filter-controls {{
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }}
-        
-        .filter-btn {{
-            padding: 8px 16px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.3s;
-        }}
-        
-        .filter-btn:hover {{
-            background: #f0f0f0;
-        }}
-        
-        .filter-btn.active {{
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }}
-        
-        .search-box {{
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            width: 200px;
-            font-size: 0.9em;
-        }}
-        
-        .recommendations {{
-            background: #e8f5e8;
-            border-left: 4px solid #4caf50;
-            padding: 20px;
-            margin-top: 20px;
-        }}
-        
-        .recommendations h3 {{
-            color: #2e7d32;
-            margin-bottom: 15px;
-        }}
-        
-        .recommendation-item {{
-            margin-bottom: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            border-left: 4px solid #4caf50;
-        }}
-        
-        .recommendation-priority {{
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: 500;
-            margin-bottom: 10px;
-        }}
-        
-        .priority-high {{
-            background: #ffebee;
-            color: #c62828;
-        }}
-        
-        .priority-medium {{
-            background: #fff3e0;
-            color: #ef6c00;
-        }}
-        
-        .priority-low {{
-            background: #e8f5e8;
-            color: #2e7d32;
-        }}
-        
-        .recommendation-issue {{
-            font-weight: 600;
-            margin-bottom: 10px;
-        }}
-        
-        .recommendation-suggestions {{
-            list-style: none;
-            padding-left: 0;
-        }}
-        
-        .recommendation-suggestions li {{
-            padding: 5px 0;
-            border-bottom: 1px solid #e8f5e8;
-        }}
-        
-        .recommendation-suggestions li:last-child {{
-            border-bottom: none;
-        }}
-        
-        .recommendation-suggestions li:before {{
-            content: "✓";
-            color: #4caf50;
-            font-weight: bold;
-            margin-right: 10px;
-        }}
-        
-        .summary-stats {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }}
-        
-        .summary-stat {{
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }}
-        
-        .summary-stat .number {{
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-        }}
-        
-        .summary-stat .label {{
-            font-size: 0.8em;
-            color: #666;
-            margin-top: 5px;
-        }}
-        
-        .hidden {{
-            display: none;
-        }}
-        
-        @media (max-width: 768px) {{
-            .stats-grid {{
-                grid-template-columns: 1fr;
-            }}
+            # 生成各个部分
+            performance_metrics_section = self._generate_performance_metrics_section(key_metrics, scores)
+            network_section = self._generate_network_section(network_analysis)
+            resources_section = self._generate_all_resources_section(all_resources, network_analysis)
+            recommendations_section = self._generate_recommendations_section(recommendations)
             
-            .metrics-grid {{
-                grid-template-columns: 1fr;
-            }}
-            
-            .resource-table {{
+            # CSS样式
+            css_styles = """
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: #f5f5f5;
+                color: #333;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            header {
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+            }
+            header h1 {
+                margin: 0 0 20px 0;
+                color: #2c3e50;
+            }
+            .report-info {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+            }
+            .section {
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+                overflow: hidden;
+            }
+            .section-header {
+                background: #f8f9fa;
+                padding: 20px;
+                border-bottom: 1px solid #e9ecef;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .section-header h2 {
+                margin: 0;
+                color: #2c3e50;
+            }
+            .section-content {
+                padding: 20px;
+            }
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .stat-card {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+                border: 1px solid #e9ecef;
+            }
+            .stat-card .value {
+                font-size: 2em;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 5px;
+            }
+            .stat-card .label {
+                color: #6c757d;
+                font-size: 0.9em;
+            }
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+            }
+            .metric-card {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+                border: 1px solid #e9ecef;
+            }
+            .metric-name {
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #2c3e50;
+            }
+            .metric-value {
+                font-size: 1.5em;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 5px;
+            }
+            .metric-score {
+                color: #6c757d;
+                font-size: 0.9em;
+            }
+            .score {
+                padding: 5px 10px;
+                border-radius: 15px;
+                font-weight: bold;
+            }
+            .score-good { background: #d4edda; color: #155724; }
+            .score-medium { background: #fff3cd; color: #856404; }
+            .score-poor { background: #f8d7da; color: #721c24; }
+            .recommendation-item {
+                background: #f8f9fa;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+                border-left: 4px solid #007bff;
+            }
+            .recommendation-priority {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 12px;
                 font-size: 0.8em;
-            }}
-            
-            .resource-table th,
-            .resource-table td {{
-                padding: 8px;
-            }}
-            
-            .filter-controls {{
-                flex-direction: column;
-            }}
-            
-            .search-box {{
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .priority-high { background: #f8d7da; color: #721c24; }
+            .priority-medium { background: #fff3cd; color: #856404; }
+            .priority-low { background: #d4edda; color: #155724; }
+            .recommendation-issue {
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #2c3e50;
+            }
+            .recommendation-suggestions {
+                margin: 0;
+                padding-left: 20px;
+            }
+            .recommendation-suggestions li {
+                margin-bottom: 5px;
+                color: #6c757d;
+            }
+            .summary-stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .summary-stat {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                text-align: center;
+                border: 1px solid #e9ecef;
+            }
+            .summary-stat .number {
+                font-size: 1.5em;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 5px;
+            }
+            .summary-stat .label {
+                color: #6c757d;
+                font-size: 0.9em;
+            }
+            .filter-controls {
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            .search-box {
+                padding: 8px 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 14px;
+                min-width: 200px;
+            }
+            .filter-btn {
+                padding: 8px 16px;
+                border: 1px solid #ddd;
+                background: white;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .filter-btn.active {
+                background: #007bff;
+                color: white;
+                border-color: #007bff;
+            }
+            .resource-table {
                 width: 100%;
-            }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 完整性能分析报告</h1>
-            <div class="url">{url}</div>
-            <div style="margin-top: 15px; opacity: 0.8;">
-                测试时间: {timestamp}
-            </div>
-            <div class="score-display {self._get_score_class(overall_score)}">
-                {overall_score:.1f}/100
-            </div>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="value">{summary.get('total_requests', 0)}</div>
-                <div class="label">总请求数</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{summary.get('total_size_mb', 0):.1f} MB</div>
-                <div class="label">总资源大小</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{summary.get('avg_response_time', 0):.0f} ms</div>
-                <div class="label">平均响应时间</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{summary.get('api_requests', 0)}</div>
-                <div class="label">API请求数</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{summary.get('third_party_requests', 0)}</div>
-                <div class="label">第三方请求数</div>
-            </div>
-            <div class="stat-card">
-                <div class="value">{len(network_analysis.get('large_resources', []))}</div>
-                <div class="label">大资源文件</div>
-            </div>
-        </div>
-        
-        {self._generate_performance_metrics_section(key_metrics, scores)}
-        {self._generate_recommendations_section(recommendations)}
-        {self._generate_all_resources_section(all_resources, network_analysis)}
-    </div>
-    
-    <script>
-        // 过滤和搜索功能
-        function filterResources(category) {{
-            const rows = document.querySelectorAll('.resource-row');
-            const buttons = document.querySelectorAll('.filter-btn');
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            .resource-table th,
+            .resource-table td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #e9ecef;
+            }
+            .resource-table th {
+                background: #f8f9fa;
+                font-weight: 600;
+                color: #2c3e50;
+            }
+            .resource-table tr:hover {
+                background: #f8f9fa;
+            }
+            .method-badge {
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+            .method-get { background: #e8f5e8; color: #2e7d32; }
+            .method-post { background: #fff3e0; color: #f57c00; }
+            .method-put { background: #e3f2fd; color: #1976d2; }
+            .method-delete { background: #ffebee; color: #c62828; }
+            .status-badge {
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+            .status-2xx { background: #e8f5e8; color: #2e7d32; }
+            .status-3xx { background: #fff3e0; color: #f57c00; }
+            .status-4xx { background: #ffebee; color: #c62828; }
+            .status-5xx { background: #ffebee; color: #c62828; }
+            .category-badge {
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.8em;
+                font-weight: 500;
+            }
+            .category-api { background: #e3f2fd; color: #1976d2; }
+            .category-static { background: #e8f5e8; color: #2e7d32; }
+            .category-third-party { background: #fff3e0; color: #f57c00; }
+            .category-other { background: #f3e5f5; color: #7b1fa2; }
+            .details-btn {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.8em;
+            }
+            .details-btn:hover {
+                background: #5a6fd8;
+            }
+            .details-content {
+                background: #f8f9fa;
+                border: 1px solid #e9ecef;
+                border-radius: 8px;
+                padding: 15px;
+                margin: 10px 0;
+            }
+            .details-section {
+                margin-bottom: 15px;
+            }
+            .details-section h4 {
+                margin: 0 0 8px 0;
+                color: #333;
+                font-size: 0.9em;
+            }
+            .details-content pre {
+                background: #fff;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+                margin: 0;
+                font-size: 0.8em;
+                max-height: 200px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+                word-break: break-all;
+            }
+            .details-content .headers {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .details-content .header-item {
+                background: #fff;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+                font-size: 0.8em;
+            }
+            .details-content .header-name {
+                font-weight: 600;
+                color: #333;
+            }
+            .details-content .header-value {
+                color: #666;
+                word-break: break-all;
+            }
+            .debug-section {
+                background: #f5f5f5;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+                border-left: 4px solid #007bff;
+            }
+            """
             
-            // 更新按钮状态
-            buttons.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            // 过滤行
-            rows.forEach(row => {{
-                if (category === 'all' || row.dataset.category === category) {{
-                    row.classList.remove('hidden');
-                }} else {{
-                    row.classList.add('hidden');
-                }}
-            }});
-        }}
-        
-        function searchResources() {{
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const rows = document.querySelectorAll('.resource-row');
-            
-            rows.forEach(row => {{
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {{
-                    row.classList.remove('hidden');
-                }} else {{
-                    row.classList.add('hidden');
-                }}
-            }});
-        }}
-        
-        // 排序功能
-        function sortTable(columnIndex) {{
-            const table = document.querySelector('.resource-table');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            rows.sort((a, b) => {{
-                const aValue = a.cells[columnIndex].textContent;
-                const bValue = b.cells[columnIndex].textContent;
+            # JavaScript代码
+            javascript_code = """
+            function searchResources() {
+                const input = document.getElementById('searchInput');
+                const filter = input.value.toLowerCase();
+                const rows = document.querySelectorAll('.resource-row');
+                const detailsRows = document.querySelectorAll('.details-row');
                 
-                // 尝试数字排序
-                const aNum = parseFloat(aValue);
-                const bNum = parseFloat(bValue);
+                // 收起所有展开的详情行
+                detailsRows.forEach(detailsRow => {
+                    detailsRow.style.display = 'none';
+                });
                 
-                if (!isNaN(aNum) && !isNaN(bNum)) {{
-                    return aNum - bNum;
-                }}
+                // 重置所有"查看详情"按钮的文本
+                const detailBtns = document.querySelectorAll('.details-btn');
+                detailBtns.forEach(btn => {
+                    btn.textContent = '查看详情';
+                });
                 
-                // 字符串排序
-                return aValue.localeCompare(bValue);
-            }});
+                rows.forEach(row => {
+                    const url = row.querySelector('td:nth-child(8)').textContent.toLowerCase();
+                    const domain = row.querySelector('td:nth-child(1)').textContent.toLowerCase();
+                    const method = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                    
+                    if (url.includes(filter) || domain.includes(filter) || method.includes(filter)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
             
-            // 重新插入排序后的行
-            rows.forEach(row => tbody.appendChild(row));
-        }}
-    </script>
-</body>
-</html>
-"""
+            function filterResources(category) {
+                const rows = document.querySelectorAll('.resource-row');
+                const buttons = document.querySelectorAll('.filter-btn');
+                const detailsRows = document.querySelectorAll('.details-row');
+                
+                // 更新按钮状态
+                buttons.forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                // 先收起所有展开的详情行
+                detailsRows.forEach(detailsRow => {
+                    detailsRow.style.display = 'none';
+                });
+                
+                // 重置所有"查看详情"按钮的文本
+                const detailBtns = document.querySelectorAll('.details-btn');
+                detailBtns.forEach(btn => {
+                    btn.textContent = '查看详情';
+                });
+                
+                rows.forEach(row => {
+                    const rowCategory = row.getAttribute('data-category');
+                    if (category === 'all' || rowCategory === category) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+            
+            function sortTable(columnIndex) {
+                const table = document.querySelector('.resource-table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.details-row)'));
+                
+                rows.sort((a, b) => {
+                    const aValue = a.cells[columnIndex].textContent;
+                    const bValue = b.cells[columnIndex].textContent;
+                    
+                    // 数字排序
+                    if (!isNaN(aValue) && !isNaN(bValue)) {
+                        return parseFloat(aValue) - parseFloat(bValue);
+                    }
+                    
+                    // 字符串排序
+                    return aValue.localeCompare(bValue);
+                });
+                
+                // 重新插入排序后的行
+                rows.forEach(row => {
+                    tbody.appendChild(row);
+                    // 同时移动对应的详情行
+                    const index = row.querySelector('.details-btn').getAttribute('onclick').match(/\d+/)[0];
+                    const detailsRow = document.getElementById('details-' + index);
+                    if (detailsRow) {
+                        tbody.appendChild(detailsRow);
+                    }
+                });
+            }
+            
+            function toggleDetails(index) {
+                const detailsRow = document.getElementById('details-' + index);
+                const btn = event.target;
+                
+                if (detailsRow.style.display === 'none') {
+                    detailsRow.style.display = 'table-row';
+                    btn.textContent = '隐藏详情';
+                } else {
+                    detailsRow.style.display = 'none';
+                    btn.textContent = '查看详情';
+                }
+            }
+            """
+            
+            # 组合完整的HTML报告
+            html = f"""
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>性能分析报告 - {report['url']}</title>
+                <style>
+                    {css_styles}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <header>
+                        <h1>🔍 Chrome Performance Doctor 分析报告</h1>
+                        <div class="report-info">
+                            <div><strong>URL:</strong> {report['url']}</div>
+                            <div><strong>测试时间:</strong> {report['test_date']}</div>
+                            <div><strong>总体评分:</strong> <span class="score {self._get_score_class(report['overall_score'])}">{report['overall_score']:.1f}/100</span></div>
+                        </div>
+                    </header>
+                    
+                    {performance_metrics_section}
+                    
+                    {network_section}
+                    
+                    {resources_section}
+                    
+                    {recommendations_section}
+                </div>
+                
+                <script>
+                    {javascript_code}
+                </script>
+            </body>
+            </html>
+            """
             
             return html
             
@@ -1389,38 +1340,61 @@ URL: {report['url']}
         return html
     
     def _generate_all_resources_section(self, all_resources: List[Dict[str, Any]], network_analysis: Dict[str, Any]) -> str:
-        """生成所有资源列表部分（增强版，包含详细信息）"""
+        """生成所有资源请求详细信息部分"""
         if not all_resources:
             return ""
         
-        # 统计信息
-        total_resources = len(all_resources)
-        api_count = len([r for r in all_resources if r.get("isApi", False)])
-        static_count = len([r for r in all_resources if r.get("isStatic", False)])
-        third_party_count = len([r for r in all_resources if r.get("isThirdParty", False)])
+        # 调试：统计API资源
+        api_resources = [r for r in all_resources if r.get("isApi", False)]
+        static_resources = [r for r in all_resources if r.get("isStatic", False)]
+        third_party_resources = [r for r in all_resources if r.get("isThirdParty", False)]
+        other_resources = [r for r in all_resources if not r.get("isApi", False) and not r.get("isStatic", False) and not r.get("isThirdParty", False)]
         
         html = f"""
         <div class="section">
             <div class="section-header">
-                <h2>📋 所有资源请求详细信息 ({total_resources} 个)</h2>
+                <h2>📋 所有资源请求详细信息 ({len(all_resources)} 个)</h2>
             </div>
             <div class="section-content">
                 <div class="summary-stats">
                     <div class="summary-stat">
-                        <div class="number">{api_count}</div>
+                        <div class="number">{len(api_resources)}</div>
                         <div class="label">API请求</div>
                     </div>
                     <div class="summary-stat">
-                        <div class="number">{static_count}</div>
+                        <div class="number">{len(static_resources)}</div>
                         <div class="label">静态资源</div>
                     </div>
                     <div class="summary-stat">
-                        <div class="number">{third_party_count}</div>
+                        <div class="number">{len(third_party_resources)}</div>
                         <div class="label">第三方资源</div>
                     </div>
                     <div class="summary-stat">
-                        <div class="number">{total_resources - api_count - static_count - third_party_count}</div>
+                        <div class="number">{len(other_resources)}</div>
                         <div class="label">其他资源</div>
+                    </div>
+                </div>
+                
+                <!-- 调试信息：API资源列表 -->
+                <div class="debug-section" style="background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #007bff;">
+                    <h4>🔍 调试信息：API资源详情 ({len(api_resources)} 个)</h4>
+                    <div style="font-size: 12px; color: #666;">
+                        <strong>统计卡片显示API数：</strong>{network_analysis.get("summary", {}).get("api_requests", 0)}<br>
+                        <strong>实际API资源数：</strong>{len(api_resources)}<br>
+                        <strong>API资源列表：</strong>
+                    </div>
+                    <div style="max-height: 200px; overflow-y: auto; background: white; padding: 10px; margin-top: 10px; border-radius: 3px;">
+        """
+        
+        for i, resource in enumerate(api_resources):
+            html += f"""
+                        <div style="margin-bottom: 5px; padding: 5px; border-bottom: 1px solid #eee;">
+                            <strong>{i+1}.</strong> {resource.get('url', 'Unknown URL')}<br>
+                            <span style="color: #666;">域名: {resource.get('domain', 'Unknown')} | 方法: {resource.get('method', 'GET')} | 状态: {resource.get('status', 0)}</span>
+                        </div>
+            """
+        
+        html += """
                     </div>
                 </div>
                 
@@ -1692,4 +1666,49 @@ URL: {report['url']}
             """
         
         html += "</div>"
+        return html
+    
+    def _generate_network_section(self, network_analysis: Dict[str, Any]) -> str:
+        """生成网络分析部分"""
+        if not network_analysis or not network_analysis.get("summary"):
+            return ""
+        
+        summary = network_analysis["summary"]
+        
+        html = f"""
+        <div class="section">
+            <div class="section-header">
+                <h2>🌐 网络请求分析</h2>
+            </div>
+            <div class="section-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="value">{summary.get('total_requests', 0)}</div>
+                        <div class="label">总请求数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">{summary.get('total_size_mb', 0)} MB</div>
+                        <div class="label">总资源大小</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">{summary.get('avg_response_time', 0)} ms</div>
+                        <div class="label">平均响应时间</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">{summary.get('api_requests', 0)}</div>
+                        <div class="label">API请求数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">{summary.get('third_party_requests', 0)}</div>
+                        <div class="label">第三方请求数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value">{len(network_analysis.get('large_resources', []))}</div>
+                        <div class="label">大资源文件</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+        
         return html

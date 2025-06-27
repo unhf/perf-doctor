@@ -53,27 +53,36 @@ class NetworkCollector(BaseCollector):
     async def collect(self) -> Dict[str, Any]:
         """收集网络请求数据"""
         try:
-            # 获取基础统计信息
-            statistics = await self._get_network_statistics()
-            
-            # 获取增强的资源时序数据
+            # 获取增强的资源时序数据（只用增强结果，不再用JS统计）
             resources = await self._get_enhanced_resource_timing()
             
             # 分析资源
             await self._analyze_resources(resources)
             
-            # 使用增强分析结果更新统计信息
+            # 统计信息全部基于增强资源分析
             api_count = len([r for r in resources if r.get("isApi", False)])
             static_count = len([r for r in resources if r.get("isStatic", False)])
             third_party_count = len([r for r in resources if r.get("isThirdParty", False)])
-            
-            # 更新统计信息
-            statistics.update({
+            total_size = sum(r.get("transferSize", 0) for r in resources)
+            response_times = [r.get("responseTime", 0) for r in resources if r.get("responseTime", 0) > 0]
+            avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+            requests_by_type = {}
+            requests_by_domain = {}
+            for r in resources:
+                initiator_type = r.get("initiatorType", "unknown")
+                requests_by_type[initiator_type] = requests_by_type.get(initiator_type, 0) + 1
+                domain = r.get("domain", "unknown")
+                requests_by_domain[domain] = requests_by_domain.get(domain, 0) + 1
+            statistics = {
+                "totalRequests": len(resources),
+                "totalSize": total_size,
+                "avgResponseTime": avg_response_time,
                 "apiRequests": api_count,
                 "staticRequests": static_count,
-                "thirdPartyRequests": third_party_count
-            })
-            
+                "thirdPartyRequests": third_party_count,
+                "requestsByType": requests_by_type,
+                "requestsByDomain": requests_by_domain
+            }
             return {
                 "type": "network_requests",
                 "data": {
@@ -82,7 +91,6 @@ class NetworkCollector(BaseCollector):
                     "analysis": self.resource_analysis
                 }
             }
-            
         except Exception as e:
             self.logger.error(f"收集网络数据失败: {e}")
             return {
