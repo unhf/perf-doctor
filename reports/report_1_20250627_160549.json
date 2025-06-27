@@ -1,0 +1,179 @@
+{
+  "url": "https://httpbin.org/json",
+  "timestamp": 1751011542.663199,
+  "test_date": "2025-06-27 16:05:42",
+  "load_time": 6.346326112747192,
+  "key_metrics": {
+    "fcp": 1308,
+    "ttfb": 506,
+    "dom_ready": 1281,
+    "page_load": 1282,
+    "dns_lookup": 22,
+    "tcp_connect": 541,
+    "Timestamp": 113626.185305,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 3,
+    "Frames": 1,
+    "JSEventListeners": 0,
+    "LayoutObjects": 15,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 25,
+    "Resources": 1,
+    "ContextLifecycleStateObservers": 3,
+    "V8PerContextDatas": 2,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 3,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 1,
+    "ArrayBufferContents": 0,
+    "LayoutCount": 1,
+    "RecalcStyleCount": 1,
+    "LayoutDuration": 0.007828,
+    "RecalcStyleDuration": 0.00023,
+    "DevToolsCommandDuration": 0.000154,
+    "ScriptDuration": 0,
+    "V8CompileDuration": 0,
+    "TaskDuration": 0.026066,
+    "TaskOtherDuration": 0.017854,
+    "ThreadTime": 0.026287,
+    "ProcessTime": 0.09871,
+    "JSHeapUsedSize": 680208,
+    "JSHeapTotalSize": 1310720,
+    "FirstMeaningfulPaint": 113621.21254,
+    "DomContentLoaded": 113621.186679,
+    "NavigationStart": 113619.905471
+  },
+  "scores": {
+    "fcp": {
+      "value": 1308,
+      "score": 92.73333333333333,
+      "rating": "good",
+      "threshold_good": 1800,
+      "threshold_poor": 3000
+    },
+    "ttfb": {
+      "value": 506,
+      "score": 59.4,
+      "rating": "needs_improvement",
+      "threshold_good": 200,
+      "threshold_poor": 600
+    },
+    "dom_ready": {
+      "value": 1281,
+      "score": 93.595,
+      "rating": "good",
+      "threshold_good": 2000,
+      "threshold_poor": 4000
+    },
+    "page_load": {
+      "value": 1282,
+      "score": 95.72666666666666,
+      "rating": "good",
+      "threshold_good": 3000,
+      "threshold_poor": 5000
+    }
+  },
+  "overall_score": 84.61544444444444,
+  "recommendations": [
+    {
+      "category": "Time to First Byte",
+      "priority": "high",
+      "issue": "首字节时间为 506ms，服务器响应较慢",
+      "suggestions": [
+        "优化服务器性能和数据库查询",
+        "使用缓存策略",
+        "选择更好的服务器或托管服务",
+        "优化网络连接"
+      ]
+    },
+    {
+      "category": "TCP Connection",
+      "priority": "low",
+      "issue": "TCP 连接时间为 541ms，可以优化",
+      "suggestions": [
+        "启用 HTTP/2 或 HTTP/3",
+        "使用 CDN 减少连接距离",
+        "启用 Keep-Alive 连接"
+      ]
+    }
+  ],
+  "raw_data": {
+    "url": "https://httpbin.org/json",
+    "timestamp": 1751011542.663199,
+    "load_time": 6.346326112747192,
+    "performance_metrics": {
+      "Timestamp": 113626.185305,
+      "AudioHandlers": 0,
+      "AudioWorkletProcessors": 0,
+      "Documents": 3,
+      "Frames": 1,
+      "JSEventListeners": 0,
+      "LayoutObjects": 15,
+      "MediaKeySessions": 0,
+      "MediaKeys": 0,
+      "Nodes": 25,
+      "Resources": 1,
+      "ContextLifecycleStateObservers": 3,
+      "V8PerContextDatas": 2,
+      "WorkerGlobalScopes": 0,
+      "UACSSResources": 0,
+      "RTCPeerConnections": 0,
+      "ResourceFetchers": 3,
+      "AdSubframes": 0,
+      "DetachedScriptStates": 1,
+      "ArrayBufferContents": 0,
+      "LayoutCount": 1,
+      "RecalcStyleCount": 1,
+      "LayoutDuration": 0.007828,
+      "RecalcStyleDuration": 0.00023,
+      "DevToolsCommandDuration": 0.000154,
+      "ScriptDuration": 0,
+      "V8CompileDuration": 0,
+      "TaskDuration": 0.026066,
+      "TaskOtherDuration": 0.017854,
+      "ThreadTime": 0.026287,
+      "ProcessTime": 0.09871,
+      "JSHeapUsedSize": 680208,
+      "JSHeapTotalSize": 1310720,
+      "FirstMeaningfulPaint": 113621.21254,
+      "DomContentLoaded": 113621.186679,
+      "NavigationStart": 113619.905471
+    },
+    "paint_metrics": {
+      "first-paint": 1308,
+      "first-contentful-paint": 1308
+    },
+    "navigation_timing": {
+      "navigationStart": 1751011542727,
+      "fetchStart": 1751011542743,
+      "domainLookupStart": 1751011542743,
+      "domainLookupEnd": 1751011542765,
+      "connectStart": 1751011542958,
+      "connectEnd": 1751011543499,
+      "requestStart": 1751011543499,
+      "responseStart": 1751011544005,
+      "responseEnd": 1751011544005,
+      "domLoading": 1751011544007,
+      "domInteractive": 1751011544008,
+      "domContentLoadedEventStart": 1751011544008,
+      "domContentLoadedEventEnd": 1751011544008,
+      "domComplete": 1751011544009,
+      "loadEventStart": 1751011544009,
+      "loadEventEnd": 1751011544009,
+      "dnsLookup": 22,
+      "tcpConnect": 541,
+      "ttfb": 506,
+      "domReady": 1281,
+      "pageLoad": 1282,
+      "navigationType": 0,
+      "redirectCount": 0
+    },
+    "raw_data": {
+      "load_timestamp": 113621.187022
+    }
+  }
+}
