@@ -76,16 +76,27 @@ class ReportGenerator:
         try:
             # 提取关键指标
             key_metrics = self._extract_key_metrics(performance_data)
-            
-            # 计算性能评分
-            scores = self._calculate_scores(key_metrics)
-            
-            # 生成优化建议
-            recommendations = self._generate_recommendations(key_metrics, scores)
-            
             # 提取网络请求详细分析
             network_analysis = self._extract_network_analysis(performance_data)
-            
+            # 统一资源统计，确保与表格一致
+            all_resources = self._get_all_resources(network_analysis)
+            api_count = sum(1 for r in all_resources if r.get('isApi'))
+            static_count = sum(1 for r in all_resources if r.get('isStatic'))
+            third_party_count = sum(1 for r in all_resources if r.get('isThirdParty'))
+            total_requests = len(all_resources)
+            avg_response_time = 0
+            if all_resources:
+                response_times = [r.get('duration', 0) for r in all_resources if r.get('duration', 0) > 0]
+                avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+            # 用统一统计覆盖key_metrics
+            key_metrics['total_requests'] = total_requests
+            key_metrics['api_requests'] = api_count
+            key_metrics['third_party_requests'] = third_party_count
+            key_metrics['avg_response_time'] = avg_response_time
+            # 计算性能评分
+            scores = self._calculate_scores(key_metrics)
+            # 生成优化建议（用统一key_metrics）
+            recommendations = self._generate_recommendations(key_metrics, scores)
             # 构建完整报告
             report = {
                 "url": performance_data.get("url", "Unknown"),
