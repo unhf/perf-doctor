@@ -192,7 +192,7 @@
                                 </thead>
                                 <tbody>
                                     {% for resource in network_analysis.resources %}
-                                    <tr class="resource-row" data-type="{{ resource.type }}" data-url="{{ resource.url|lower }}">
+                                    <tr class="resource-row" data-type="{{ resource.type|lower }}" data-url="{{ resource.url|lower }}">
                                         <td>
                                             <span class="badge bg-{{ resource.type_color }}">{{ resource.type }}</span>
                                         </td>

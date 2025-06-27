@@ -356,11 +356,17 @@ class ReportGenerator:
         
         # 网络请求分析建议
         network_recommendations = self._generate_network_recommendations(metrics)
-        recommendations.extend(network_recommendations)
+        # 过滤掉内容为空的建议
+        for rec in network_recommendations:
+            if rec.get("issue") and rec.get("suggestions"):
+                recommendations.append(rec)
         
         # 按优先级排序
         priority_order = {"high": 0, "medium": 1, "low": 2}
         recommendations.sort(key=lambda x: priority_order.get(x["priority"], 3))
+        
+        # 过滤掉suggestions为空的建议
+        recommendations = [rec for rec in recommendations if rec.get("suggestions") and any(s.strip() for s in rec["suggestions"])]
         
         return recommendations
     
@@ -893,12 +899,12 @@ URL: {report['url']}
                 # 优化建议
                 "optimization_suggestions": [
                     {
-                        "title": rec.get("title", "优化建议"),
-                        "description": rec.get("description", ""),
-                        "level": rec.get("level", "info"),
-                        "level_color": "info" if rec.get("level") == "info" else "warning" if rec.get("level") == "warning" else "danger",
-                        "icon": "info-circle" if rec.get("level") == "info" else "exclamation-triangle" if rec.get("level") == "warning" else "exclamation-circle",
-                        "details": rec.get("details", "")
+                        "title": rec.get("issue", "优化建议"),
+                        "description": "<br>".join(rec.get("suggestions", []) or ["请检查具体性能指标，或联系开发者完善建议内容。"]),
+                        "level": rec.get("priority", "medium"),
+                        "level_color": "danger" if rec.get("priority") == "high" else "warning" if rec.get("priority") == "medium" else "info",
+                        "icon": "exclamation-circle" if rec.get("priority") == "high" else "exclamation-triangle" if rec.get("priority") == "medium" else "info-circle",
+                        "details": ""
                     }
                     for rec in recommendations
                 ],
