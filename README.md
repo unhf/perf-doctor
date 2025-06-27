@@ -60,7 +60,7 @@
 
 - **Python**: 3.7+
 - **浏览器**: Google Chrome 或 Chromium
-- **系统**: macOS、Windows 或 Linux## 📦 安装
+- **系统**: macOS## 📦 安装
 
 ### 方式一：使用 Pipenv（推荐）
 

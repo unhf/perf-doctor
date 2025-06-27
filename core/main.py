@@ -42,10 +42,58 @@ def setup_logging():
         filemode='a' if log_file else None
     )
 
+def show_help():
+    """显示帮助信息"""
+    help_text = """
+🔍 Chrome Performance Doctor - 网页性能分析工具
+
+用法:
+    perf-doctor [OPTIONS] [URL...]
+
+参数:
+    URL...              要分析的网页 URL（支持多个）
+
+选项:
+    -h, --help         显示此帮助信息
+    -v, --version      显示版本信息
+
+示例:
+    perf-doctor https://example.com
+    perf-doctor https://site1.com https://site2.com https://site3.com
+
+功能特性:
+    ✅ 自动继承 Chrome 登录状态，免登录分析业务页面
+    ✅ 自动启动 Chrome 调试实例
+    ✅ 收集完整的性能指标（FCP、LCP、TTFB 等）
+    ✅ 生成详细的性能分析报告
+    ✅ 支持批量页面分析
+    ✅ 识别性能瓶颈并提供优化建议
+
+报告输出:
+    • 终端显示概要信息和关键指标
+    • JSON 格式详细报告保存到 reports/ 目录
+    • 包含具体的优化建议和改进措施
+
+技术实现:
+    • 通过 Chrome DevTools Protocol 收集性能数据
+    • 自动复制主 Chrome 的登录信息到调试实例
+    • 支持复杂业务页面的深度性能分析
+"""
+    print(help_text)
+
 async def main():
     """主函数"""
     setup_logging()
     logger = logging.getLogger(__name__)
+    
+    # 处理帮助和版本参数
+    if len(sys.argv) > 1:
+        if sys.argv[1] in ['-h', '--help']:
+            show_help()
+            return 0
+        elif sys.argv[1] in ['-v', '--version']:
+            print("Chrome Performance Doctor v1.0.0")
+            return 0
     
     # 从命令行参数获取 URL，如果没有则使用默认 URL
     test_urls = sys.argv[1:] if len(sys.argv) > 1 else DEFAULT_TEST_URLS
