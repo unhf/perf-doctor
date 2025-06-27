@@ -502,7 +502,10 @@ class ReportGenerator:
                             "request_headers": resource.get("requestHeaders", {}),
                             "response_headers": resource.get("responseHeaders", {}),
                             "request_body": resource.get("requestBody", ""),
-                            "response_body": resource.get("responseBody", "")
+                            "response_body": resource.get("responseBody", ""),
+                            "isApi": bool(resource.get("isApi", False)),
+                            "isStatic": bool(resource.get("isStatic", False)),
+                            "isThirdParty": bool(resource.get("isThirdParty", False)),
                         }
                         formatted_resources.append(formatted_resource)
                     
@@ -820,10 +823,9 @@ URL: {report['url']}
     def generate_full_html_report(self, report: Dict[str, Any]) -> str:
         """
         生成完整的HTML性能报告
-        
+
         Args:
             report: 性能报告数据
-            
         Returns:
             HTML格式的完整报告
         """
@@ -831,16 +833,18 @@ URL: {report['url']}
             url = report.get("url", "Unknown")
             timestamp = report.get("test_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             overall_score = report.get("overall_score", 0)
-            
-            # 提取网络分析数据
             network_analysis = report.get("network_analysis", {})
-            
-            # 提取性能指标
             key_metrics = report.get("key_metrics", {})
             scores = report.get("scores", {})
             recommendations = report.get("recommendations", [])
-            
-            # 准备模板数据
+
+            # 统一资源统计，确保与资源表格一致
+            all_resources = self._get_all_resources(network_analysis)
+            api_count = sum(1 for r in all_resources if r.get('isApi'))
+            static_count = sum(1 for r in all_resources if r.get('isStatic'))
+            third_party_count = sum(1 for r in all_resources if r.get('isThirdParty'))
+            total_requests = len(all_resources)
+
             template_data = {
                 "report_title": f"性能分析报告 - {url}",
                 "url": url,
@@ -848,36 +852,12 @@ URL: {report['url']}
                 "generation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "version": "1.0.0",
                 "total_duration": int(report.get("load_time", 0)),
-                
-                # 关键指标卡片
                 "key_metrics": [
-                    {
-                        "name": "首屏绘制",
-                        "value": f"{key_metrics.get('fcp', 0):.0f}",
-                        "unit": "ms",
-                        "icon": "bi-speedometer2"
-                    },
-                    {
-                        "name": "最大内容绘制",
-                        "value": f"{key_metrics.get('lcp', 0):.0f}",
-                        "unit": "ms",
-                        "icon": "bi-display"
-                    },
-                    {
-                        "name": "首次字节",
-                        "value": f"{key_metrics.get('ttfb', 0):.0f}",
-                        "unit": "ms",
-                        "icon": "bi-clock"
-                    },
-                    {
-                        "name": "综合评分",
-                        "value": f"{overall_score:.0f}",
-                        "unit": "分",
-                        "icon": "bi-star-fill"
-                    }
+                    {"name": "首屏绘制", "value": f"{key_metrics.get('fcp', 0):.0f}", "unit": "ms", "icon": "bi-speedometer2"},
+                    {"name": "最大内容绘制", "value": f"{key_metrics.get('lcp', 0):.0f}", "unit": "ms", "icon": "bi-display"},
+                    {"name": "首次字节", "value": f"{key_metrics.get('ttfb', 0):.0f}", "unit": "ms", "icon": "bi-clock"},
+                    {"name": "综合评分", "value": f"{overall_score:.0f}", "unit": "分", "icon": "bi-star-fill"}
                 ],
-                
-                # 性能指标详情
                 "performance_metrics": {
                     "页面加载": [
                         {"name": "DOM就绪", "value": f"{key_metrics.get('dom_ready', 0):.0f}", "unit": "ms"},
@@ -886,17 +866,19 @@ URL: {report['url']}
                         {"name": "TCP连接", "value": f"{key_metrics.get('tcp_connect', 0):.0f}", "unit": "ms"}
                     ],
                     "网络请求": [
-                        {"name": "总请求数", "value": f"{key_metrics.get('total_requests', 0)}", "unit": ""},
-                        {"name": "API请求数", "value": f"{key_metrics.get('api_requests', 0)}", "unit": ""},
-                        {"name": "第三方请求", "value": f"{key_metrics.get('third_party_requests', 0)}", "unit": ""},
+                        {"name": "总请求数", "value": f"{total_requests}", "unit": ""},
+                        {"name": "API请求数", "value": f"{api_count}", "unit": ""},
+                        {"name": "第三方请求", "value": f"{third_party_count}", "unit": ""},
                         {"name": "平均响应时间", "value": f"{key_metrics.get('avg_response_time', 0):.0f}", "unit": "ms"}
                     ]
                 },
-                
-                # 网络分析
-                "network_analysis": network_analysis,
-                
-                # 优化建议
+                "network_analysis": {
+                    **network_analysis,
+                    "api_count": api_count,
+                    "static_count": static_count,
+                    "third_party_count": third_party_count,
+                    "total_requests": total_requests
+                },
                 "optimization_suggestions": [
                     {
                         "title": rec.get("issue", "优化建议"),
@@ -908,8 +890,6 @@ URL: {report['url']}
                     }
                     for rec in recommendations
                 ],
-                
-                # 内存分析
                 "memory_analysis": {
                     "metrics": [
                         {"name": "已用内存", "value": f"{key_metrics.get('memory_used', 0) / 1024 / 1024:.1f}", "unit": "MB"},
@@ -919,8 +899,7 @@ URL: {report['url']}
                     ]
                 } if key_metrics.get('memory_used') else None
             }
-            
-            # 使用 Jinja2 模板生成完整的 HTML 报告
+
             if self.jinja_env:
                 try:
                     template = self.jinja_env.get_template('report_template.html')
@@ -928,12 +907,9 @@ URL: {report['url']}
                     return html
                 except Exception as e:
                     self.logger.error(f"模板渲染失败: {e}")
-                    # 如果模板渲染失败，使用备选方案
                     return self._generate_fallback_html(template_data)
             else:
-                # 如果 Jinja2 环境未初始化，使用备选方案
                 return self._generate_fallback_html(template_data)
-            
         except Exception as e:
             self.logger.error(f"生成完整HTML报告失败: {e}")
             return f"<html><body><h1>报告生成失败</h1><p>错误: {e}</p></body></html>"
