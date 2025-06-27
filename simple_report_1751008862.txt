@@ -1,0 +1,15 @@
+
+=== 页面性能报告 ===
+页面: 
+URL: chrome-extension://nkeimhogjdpnpccoofpliimaahmaaome/background.html
+测试时间: 2025-06-27 15:21:02
+
+=== 关键指标 ===
+页面加载时间: 188ms
+DOM就绪时间: 187ms
+首字节时间: 49ms
+DNS查询时间: 0ms
+TCP连接时间: 0ms
+
+=== 性能评估 ===
+✅ 加载速度: 优秀
