@@ -74,29 +74,73 @@ class ReportGenerator:
         """提取关键性能指标"""
         metrics = {}
         
-        # 从绘制指标中提取
-        paint_metrics = data.get("paint_metrics", {})
-        if "first-contentful-paint" in paint_metrics:
-            metrics["fcp"] = paint_metrics["first-contentful-paint"]
-        if "largest-contentful-paint" in paint_metrics:
-            metrics["lcp"] = paint_metrics["largest-contentful-paint"]
+        # 处理新的插件化数据结构
+        if "performance_data" in data:
+            # 新的插件化架构数据结构
+            performance_data = data["performance_data"]
+            
+            # 从收集器数据中提取指标
+            if "data" in performance_data:
+                collector_data = performance_data["data"]
+                
+                # 从 PaintCollector 中提取绘制指标
+                if "PaintCollector" in collector_data:
+                    paint_data = collector_data["PaintCollector"].get("data", {})
+                    if "first-contentful-paint" in paint_data:
+                        metrics["fcp"] = paint_data["first-contentful-paint"]
+                    if "largest-contentful-paint" in paint_data:
+                        metrics["lcp"] = paint_data["largest-contentful-paint"]
+                
+                # 从 NavigationCollector 中提取导航时序
+                if "NavigationCollector" in collector_data:
+                    nav_data = collector_data["NavigationCollector"].get("data", {})
+                    if nav_data:
+                        metrics["ttfb"] = nav_data.get("ttfb", 0)
+                        metrics["dom_ready"] = nav_data.get("domReady", 0)
+                        metrics["page_load"] = nav_data.get("pageLoad", 0)
+                        metrics["dns_lookup"] = nav_data.get("dnsLookup", 0)
+                        metrics["tcp_connect"] = nav_data.get("tcpConnect", 0)
+                
+                # 从 PerformanceCollector 中提取性能指标
+                if "PerformanceCollector" in collector_data:
+                    perf_data = collector_data["PerformanceCollector"].get("data", {})
+                    for key, value in perf_data.items():
+                        if key not in metrics and isinstance(value, (int, float)):
+                            metrics[key] = value
+                
+                # 从 MemoryCollector 中提取内存指标
+                if "MemoryCollector" in collector_data:
+                    memory_data = collector_data["MemoryCollector"].get("data", {})
+                    if memory_data:
+                        metrics["memory_used"] = memory_data.get("usedJSHeapSize", 0)
+                        metrics["memory_total"] = memory_data.get("totalJSHeapSize", 0)
+                        metrics["memory_limit"] = memory_data.get("jsHeapSizeLimit", 0)
         
-        # 从导航时序中提取
-        nav_timing = data.get("navigation_timing", {})
-        if nav_timing:
-            metrics["ttfb"] = nav_timing.get("ttfb", 0)
-            metrics["dom_ready"] = nav_timing.get("domReady", 0)
-            metrics["page_load"] = nav_timing.get("pageLoad", 0)
-            metrics["dns_lookup"] = nav_timing.get("dnsLookup", 0)
-            metrics["tcp_connect"] = nav_timing.get("tcpConnect", 0)
+        # 兼容旧的数据结构格式
+        else:
+            # 从绘制指标中提取
+            paint_metrics = data.get("paint_metrics", {})
+            if "first-contentful-paint" in paint_metrics:
+                metrics["fcp"] = paint_metrics["first-contentful-paint"]
+            if "largest-contentful-paint" in paint_metrics:
+                metrics["lcp"] = paint_metrics["largest-contentful-paint"]
+            
+            # 从导航时序中提取
+            nav_timing = data.get("navigation_timing", {})
+            if nav_timing:
+                metrics["ttfb"] = nav_timing.get("ttfb", 0)
+                metrics["dom_ready"] = nav_timing.get("domReady", 0)
+                metrics["page_load"] = nav_timing.get("pageLoad", 0)
+                metrics["dns_lookup"] = nav_timing.get("dnsLookup", 0)
+                metrics["tcp_connect"] = nav_timing.get("tcpConnect", 0)
+            
+            # 从性能指标中补充
+            perf_metrics = data.get("performance_metrics", {})
+            for key, value in perf_metrics.items():
+                if key not in metrics and isinstance(value, (int, float)):
+                    metrics[key] = value
         
-        # 从性能指标中补充
-        perf_metrics = data.get("performance_metrics", {})
-        for key, value in perf_metrics.items():
-            if key not in metrics and isinstance(value, (int, float)):
-                metrics[key] = value
-        
-        self.logger.debug(f"提取到 {len(metrics)} 个关键指标")
+        self.logger.debug(f"提取到 {len(metrics)} 个关键指标: {list(metrics.keys())}")
         return metrics
     
     def _calculate_scores(self, metrics: Dict[str, float]) -> Dict[str, Dict[str, Any]]:

@@ -7,4 +7,27 @@ from .devtools_client import DevToolsClient
 from .performance_collector import PerformanceCollector
 from .report_generator import ReportGenerator
 
-__all__ = ['ChromeManager', 'DevToolsClient', 'PerformanceCollector', 'ReportGenerator']
+# 收集器插件
+from .collectors import (
+    BaseCollector,
+    PerformanceCollector as CollectorPerformanceCollector,
+    PaintCollector,
+    NavigationCollector,
+    MemoryCollector,
+    NetworkCollector,
+    CollectorManager
+)
+
+__all__ = [
+    'ChromeManager', 
+    'DevToolsClient', 
+    'PerformanceCollector', 
+    'ReportGenerator',
+    'BaseCollector',
+    'CollectorPerformanceCollector',
+    'PaintCollector',
+    'NavigationCollector', 
+    'MemoryCollector',
+    'NetworkCollector',
+    'CollectorManager'
+]
