@@ -164,16 +164,16 @@
                         <h5 class="mb-0">
                             <i class="bi bi-globe"></i> 网络请求分析
                         </h5>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 align-items-center" style="width:100%;max-width:600px;">
                             <input type="text" class="form-control form-control-sm search-box" 
-                                   id="resourceSearch" placeholder="搜索资源...">
-                            <div class="btn-group btn-group-sm" role="group">
+                                   id="resourceSearch" placeholder="搜索资源..." style="height:38px;">
+                            <div class="btn-group btn-group-sm" role="group" style="height:38px;">
                                 <button type="button" class="btn btn-outline-primary filter-badge active" 
-                                        data-filter="all">全部</button>
+                                        data-filter="all" style="height:38px;line-height:24px;">全部</button>
                                 <button type="button" class="btn btn-outline-primary filter-badge" 
-                                        data-filter="api">API ({{ network_analysis.api_count }})</button>
+                                        data-filter="api" style="height:38px;line-height:24px;">API ({{ network_analysis.api_count }})</button>
                                 <button type="button" class="btn btn-outline-primary filter-badge" 
-                                        data-filter="static">静态资源 ({{ network_analysis.static_count }})</button>
+                                        data-filter="static" style="height:38px;line-height:24px;">静态资源 ({{ network_analysis.static_count }})</button>
                             </div>
                         </div>
                     </div>
@@ -182,12 +182,12 @@
                             <table class="table table-hover mb-0" id="resourceTable">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>类型</th>
-                                        <th>URL</th>
-                                        <th>状态</th>
-                                        <th>大小</th>
-                                        <th>耗时</th>
-                                        <th>操作</th>
+                                        <th style="width: 80px;">类型</th>
+                                        <th style="width: 350px; word-break: break-all; white-space: normal;">URL</th>
+                                        <th style="width: 80px;">状态</th>
+                                        <th style="width: 100px; cursor:pointer;" id="sortSize">大小 <span id="sizeSortIcon">⇅</span></th>
+                                        <th style="width: 100px; cursor:pointer;" id="sortDuration">耗时 <span id="durationSortIcon">⇅</span></th>
+                                        <th style="width: 100px;">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -196,8 +196,8 @@
                                         <td>
                                             <span class="badge bg-{{ resource.type_color }}">{{ resource.type }}</span>
                                         </td>
-                                        <td>
-                                            <div class="text-truncate" style="max-width: 300px;" title="{{ resource.url }}">
+                                        <td style="word-break: break-all; white-space: normal;">
+                                            <div title="{{ resource.url }}">
                                                 {{ resource.url }}
                                             </div>
                                         </td>
@@ -421,6 +421,68 @@
                     row.style.display = 'none';
                 }
             });
+        });
+
+        // 排序功能
+        document.addEventListener('DOMContentLoaded', function() {
+            let sizeAsc = true;
+            let durationAsc = true;
+
+            document.getElementById('sortSize').onclick = function() {
+                sortTableByColumn('size', sizeAsc);
+                sizeAsc = !sizeAsc;
+                document.getElementById('sizeSortIcon').textContent = sizeAsc ? '↑' : '↓';
+                document.getElementById('durationSortIcon').textContent = '⇅';
+            };
+            document.getElementById('sortDuration').onclick = function() {
+                sortTableByColumn('duration', durationAsc);
+                durationAsc = !durationAsc;
+                document.getElementById('durationSortIcon').textContent = durationAsc ? '↑' : '↓';
+                document.getElementById('sizeSortIcon').textContent = '⇅';
+            };
+
+            function parseSize(str) {
+                if (!str) return 0;
+                if (str.endsWith('KB')) return parseFloat(str) * 1024;
+                if (str.endsWith('MB')) return parseFloat(str) * 1024 * 1024;
+                if (str.endsWith('B')) return parseFloat(str);
+                return parseFloat(str);
+            }
+            function parseDuration(str) {
+                if (!str) return 0;
+                if (str.endsWith('ms')) return parseFloat(str);
+                return parseFloat(str);
+            }
+            function sortTableByColumn(type, asc) {
+                const table = document.getElementById('resourceTable');
+                const tbody = table.querySelector('tbody');
+                // 只排序主数据行
+                const rows = Array.from(tbody.querySelectorAll('tr.resource-row'));
+                let idx = type === 'size' ? 3 : 4;
+                rows.sort((a, b) => {
+                    let aVal = a.children[idx].innerText.trim();
+                    let bVal = b.children[idx].innerText.trim();
+                    if(type === 'size') {
+                        aVal = parseSize(aVal);
+                        bVal = parseSize(bVal);
+                    } else {
+                        aVal = parseDuration(aVal);
+                        bVal = parseDuration(bVal);
+                    }
+                    return asc ? aVal - bVal : bVal - aVal;
+                });
+                // 先移除所有主数据行
+                rows.forEach(row => tbody.removeChild(row));
+                // 重新插入排序后的主数据行（如果有详情行，紧跟其后）
+                rows.forEach(row => {
+                    tbody.appendChild(row);
+                    // 如果有详情行，跟在后面
+                    let next = row.nextElementSibling;
+                    if (next && next.classList.contains('resource-details')) {
+                        tbody.appendChild(next);
+                    }
+                });
+            }
         });
 
         // 语法高亮
