@@ -3,7 +3,7 @@
 """
 
 from .base_collector import BaseCollector
-from .performance_collector import PerformanceCollector
+from .performance_metrics_collector import PerformanceMetricsCollector
 from .paint_collector import PaintCollector
 from .navigation_collector import NavigationCollector
 from .memory_collector import MemoryCollector
@@ -12,7 +12,7 @@ from .collector_manager import CollectorManager
 
 __all__ = [
     'BaseCollector',
-    'PerformanceCollector', 
+    'PerformanceMetricsCollector', 
     'PaintCollector',
     'NavigationCollector',
     'MemoryCollector',

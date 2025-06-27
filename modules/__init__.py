@@ -10,7 +10,7 @@ from .report_generator import ReportGenerator
 # 收集器插件
 from .collectors import (
     BaseCollector,
-    PerformanceCollector as CollectorPerformanceCollector,
+    PerformanceMetricsCollector,
     PaintCollector,
     NavigationCollector,
     MemoryCollector,
@@ -24,7 +24,7 @@ __all__ = [
     'PerformanceCollector', 
     'ReportGenerator',
     'BaseCollector',
-    'CollectorPerformanceCollector',
+    'PerformanceMetricsCollector',
     'PaintCollector',
     'NavigationCollector', 
     'MemoryCollector',

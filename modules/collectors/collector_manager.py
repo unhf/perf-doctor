@@ -9,7 +9,7 @@ import time
 import logging
 from typing import Dict, Any, List, Optional, Type
 from .base_collector import BaseCollector
-from .performance_collector import PerformanceCollector
+from .performance_metrics_collector import PerformanceMetricsCollector
 from .paint_collector import PaintCollector
 from .navigation_collector import NavigationCollector
 from .memory_collector import MemoryCollector
@@ -37,7 +37,7 @@ class CollectorManager:
     def _register_default_collectors(self):
         """注册默认的收集器插件"""
         default_collectors = [
-            PerformanceCollector,
+            PerformanceMetricsCollector,
             PaintCollector,
             NavigationCollector,
             MemoryCollector,

@@ -10,11 +10,11 @@ from typing import Dict, Any
 from .base_collector import BaseCollector
 
 
-class PerformanceCollector(BaseCollector):
+class PerformanceMetricsCollector(BaseCollector):
     """Performance API 指标收集器"""
     
     def __init__(self, devtools_client):
-        super().__init__(devtools_client, "PerformanceCollector")
+        super().__init__(devtools_client, "PerformanceMetricsCollector")
         self.performance_data = {}
     
     def get_required_domains(self) -> list:

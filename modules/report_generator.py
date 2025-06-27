@@ -102,8 +102,8 @@ class ReportGenerator:
                         metrics["tcp_connect"] = nav_data.get("tcpConnect", 0)
                 
                 # 从 PerformanceCollector 中提取性能指标
-                if "PerformanceCollector" in collector_data:
-                    perf_data = collector_data["PerformanceCollector"].get("data", {})
+                if "PerformanceMetricsCollector" in collector_data:
+                    perf_data = collector_data["PerformanceMetricsCollector"].get("data", {})
                     for key, value in perf_data.items():
                         if key not in metrics and isinstance(value, (int, float)):
                             metrics[key] = value
