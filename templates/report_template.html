@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>性能分析报告 - {{ report_title }}</title>
+    <title>性能分析报告 - {{ report.url }}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -92,7 +92,7 @@
                 <i class="bi bi-speedometer2"></i> 性能医生
             </a>
             <span class="navbar-text">
-                分析时间: {{ analysis_time }}
+                分析时间: {{ report.test_date }}
             </span>
         </div>
     </nav>
@@ -107,9 +107,9 @@
                             <i class="bi bi-graph-up"></i> 性能分析报告
                         </h1>
                         <p class="card-text text-muted">
-                            网站: <strong>{{ url }}</strong> | 
-                            分析时间: {{ analysis_time }} | 
-                            总耗时: {{ total_duration }}ms
+                            网站: <strong>{{ report.url }}</strong> | 
+                            分析时间: {{ report.test_date }} | 
+                            总体评分: {{ report.overall_score }}
                         </p>
                     </div>
                 </div>
@@ -118,49 +118,62 @@
 
         <!-- Key Metrics -->
         <div class="row mb-4">
-            {% for metric in key_metrics %}
+            {% for metric, value in report.key_metrics.items() %}
             <div class="col-md-3 col-sm-6 mb-3">
                 <div class="card metric-card h-100 border-0 shadow-sm">
                     <div class="card-body text-center">
                         <div class="display-6 text-primary mb-2">
-                            <i class="bi {{ metric.icon }}"></i>
+                            <i class="bi bi-graph-up"></i>
                         </div>
-                        <h5 class="card-title">{{ metric.name }}</h5>
-                        <h3 class="text-primary mb-0">{{ metric.value }}</h3>
-                        <small class="text-muted">{{ metric.unit }}</small>
+                        <h5 class="card-title">{{ metric }}</h5>
+                        <h3 class="text-primary mb-0">{{ value }}</h3>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Performance Metrics -->
+        <!-- 性能评分 -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
                         <h5 class="mb-0">
-                            <i class="bi bi-clock-history"></i> 性能指标详情
+                            <i class="bi bi-clock-history"></i> 性能评分详情
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            {% for category, metrics in performance_metrics.items() %}
+                            {% for metric, score in report.scores.items() %}
                             <div class="col-md-6 mb-3">
-                                <h6 class="text-primary">{{ category }}</h6>
+                                <h6 class="text-primary">{{ metric }}</h6>
                                 <div class="table-responsive">
                                     <table class="table table-sm">
                                         <tbody>
-                                            {% for metric in metrics %}
                                             <tr>
-                                                <td class="text-muted">{{ metric.name }}</td>
+                                                <td class="text-muted">分数</td>
                                                 <td class="text-end">
                                                     <span class="badge bg-light text-dark">
-                                                        {{ metric.value }}{{ metric.unit }}
+                                                        {{ score.score }}
                                                     </span>
                                                 </td>
                                             </tr>
-                                            {% endfor %}
+                                            <tr>
+                                                <td class="text-muted">状态</td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-light text-dark">
+                                                        {{ score.status }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">原始值</td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-light text-dark">
+                                                        {{ score.value }}
+                                                    </span>
+                                                </td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -172,177 +185,46 @@
             </div>
         </div>
 
-        <!-- Network Analysis -->
-        {% if network_analysis %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="bi bi-globe"></i> 网络请求分析
-                        </h5>
-                        <div class="d-flex gap-2 align-items-center" style="width:100%;max-width:600px;">
-                            <input type="text" class="form-control form-control-sm search-box" 
-                                   id="resourceSearch" placeholder="搜索资源..." style="height:38px;">
-                            <div class="btn-group btn-group-sm" role="group" style="height:38px;">
-                                <button type="button" class="btn btn-outline-primary filter-badge active" 
-                                        data-filter="all" style="height:38px;line-height:24px;">全部</button>
-                                <button type="button" class="btn btn-outline-primary filter-badge" 
-                                        data-filter="api" style="height:38px;line-height:24px;">API ({{ network_analysis.api_count }})</button>
-                                <button type="button" class="btn btn-outline-primary filter-badge" 
-                                        data-filter="static" style="height:38px;line-height:24px;">静态资源 ({{ network_analysis.static_count }})</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0" id="resourceTable">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 80px;">类型</th>
-                                        <th style="width: 350px; word-break: break-all; white-space: normal;">URL</th>
-                                        <th style="width: 80px;">状态</th>
-                                        <th style="width: 100px; cursor:pointer;" id="sortSize">大小 <span id="sizeSortIcon">⇅</span></th>
-                                        <th style="width: 100px; cursor:pointer;" id="sortDuration">耗时 <span id="durationSortIcon">⇅</span></th>
-                                        <th style="width: 100px;">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for resource in network_analysis.resources %}
-                                    <tr class="resource-row" data-type="{{ resource.type|lower }}" data-url="{{ resource.url|lower }}">
-                                        <td>
-                                            <span class="badge bg-{{ resource.type_color }}">{{ resource.type }}</span>
-                                        </td>
-                                        <td style="word-break: break-all; white-space: normal;">
-                                            <div title="{{ resource.url }}">
-                                                {{ resource.url }}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="status-{{ resource.status_class }}">{{ resource.status }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-secondary size-badge">{{ resource.size }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info size-badge">{{ resource.duration }}ms</span>
-                                        </td>
-                                        <td>
-                                            {% if resource.type == "Static" %}
-                                                <a href="{{ resource.url }}" class="btn btn-outline-primary btn-sm" download target="_blank">下载</a>
-                                            {% else %}
-                                                <button class="btn btn-outline-secondary btn-sm view-details-btn">查看详情</button>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr class="resource-details" style="background:#fafbfc;">
-                                        <td colspan="6">
-                                            <div class="details-content p-3">
-                                                <div class="row align-items-start">
-                                                    <div class="col-md-6 mb-3">
-                                                        <h6>请求信息</h6>
-                                                        <div class="mb-2">
-                                                            <strong>方法:</strong> 
-                                                            <span class="badge bg-primary">{{ resource.method }}</span>
-                                                        </div>
-                                                        {% if resource.request_headers %}
-                                                        <div class="mb-2">
-                                                            <strong>请求头:</strong>
-                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.request_headers|tojson(indent=2) }}</code></pre>
-                                                        </div>
-                                                        {% endif %}
-                                                        {% if resource.request_body %}
-                                                        <div class="mb-2">
-                                                            <strong>请求体:</strong>
-                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.request_body }}</code></pre>
-                                                        </div>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div class="col-md-6 mb-3">
-                                                        <h6>响应信息</h6>
-                                                        {% if resource.response_headers %}
-                                                        <div class="mb-2">
-                                                            <strong>响应头:</strong>
-                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.response_headers|tojson(indent=2) }}</code></pre>
-                                                        </div>
-                                                        {% endif %}
-                                                        {% if resource.response_body %}
-                                                        <div class="mb-2">
-                                                            <strong>响应体:</strong>
-                                                            <pre class="bg-white p-2 rounded"><code>{{ resource.response_body }}</code></pre>
-                                                        </div>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Optimization Suggestions -->
-        {% if optimization_suggestions %}
+        <!-- 优化建议 -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
                         <h5 class="mb-0">
-                            <i class="bi bi-lightbulb"></i> 优化建议 ({{ optimization_suggestions|length }}条)
+                            <i class="bi bi-lightbulb"></i> 优化建议
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% for suggestion in optimization_suggestions %}
-                        <div class="optimization-item optimization-{{ suggestion.level }}">
-                            <h6 class="text-{{ suggestion.level_color }}">
-                                <i class="bi bi-{{ suggestion.icon }}"></i> {{ suggestion.title }}
-                            </h6>
-                            <p class="mb-2">{{ suggestion.description }}</p>
-                            {% if suggestion.details %}
-                            <div class="bg-light p-3 rounded">
-                                <pre class="mb-0"><code>{{ suggestion.details }}</code></pre>
-                            </div>
-                            {% endif %}
-                        </div>
+                        {% if report.recommendations %}
+                        <ul>
+                        {% for rec in report.recommendations %}
+                            <li><strong>{{ rec.title }}:</strong> {{ rec.description }}</li>
                         {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p>暂无优化建议</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-        {% endif %}
 
-        <!-- Memory Analysis -->
-        {% if memory_analysis %}
+        <!-- 原始数据 -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
                         <h5 class="mb-0">
-                            <i class="bi bi-memory"></i> 内存使用分析
+                            <i class="bi bi-database"></i> 原始数据
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            {% for metric in memory_analysis.metrics %}
-                            <div class="col-md-3 mb-3">
-                                <div class="text-center">
-                                    <h6 class="text-muted">{{ metric.name }}</h6>
-                                    <h4 class="text-primary">{{ metric.value }}{{ metric.unit }}</h4>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
+                        <pre>{{ report.raw_data | tojson(indent=2) }}</pre>
                     </div>
                 </div>
             </div>
         </div>
-        {% endif %}
+
     </div>
 
     <!-- Footer -->

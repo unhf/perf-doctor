@@ -9,6 +9,7 @@ psutil = "*"
 pyinstaller = "*"
 requests = "*"
 jinja2 = "*"
+pytest = "*"
 
 [dev-packages]
 
