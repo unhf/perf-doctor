@@ -11,6 +11,21 @@ CHROME_CONFIG = {
     "path": None,  # Chrome 可执行文件路径，None 时自动检测
     "debug_port": 9222,  # 调试端口
     "headless": False,  # 是否无头模式
+    
+    # Cookie 继承配置
+    "inherit_cookies": True,  # 是否继承现有 Chrome 的 cookies
+    # 设为 True 时，会尝试：
+    # 1. 查找现有 Chrome 进程的用户数据目录
+    # 2. 使用默认用户数据目录（如果存在）
+    # 3. 降级到独立测试目录
+    # 设为 False 时，直接使用独立测试目录
+    
+    "user_data_dir": None,  # 用户数据目录，None 时自动检测或创建
+    # 可以手动指定用户数据目录路径，例如：
+    # macOS: "~/Library/Application Support/Google/Chrome"
+    # Windows: "~/AppData/Local/Google/Chrome/User Data"  
+    # Linux: "~/.config/google-chrome"
+    
     "extra_args": [  # 额外启动参数
         "--disable-web-security",
         "--disable-features=VizDisplayCompositor",

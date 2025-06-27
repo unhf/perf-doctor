@@ -53,7 +53,8 @@
 | 💡 **优化建议** | 针对性能问题提供具体的优化建议 |
 | 🔄 **批量测试** | 支持同时分析多个页面 |
 | 📁 **多格式报告** | 生成 JSON 和文本格式的详细报告 |
-| 🌐 **兼容性强** | 支持现有 Chrome 实例，不会干扰正常浏览 |
+| � **Cookie 继承** | 智能继承现有 Chrome 的登录状态和 cookies |
+| �🌐 **兼容性强** | 支持现有 Chrome 实例，不会干扰正常浏览 |
 
 ## 🛠 系统要求
 
@@ -133,6 +134,10 @@ CHROME_CONFIG = {
     "path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "debug_port": 9222,
     "headless": False,
+    
+    # 🍪 Cookie 继承配置
+    "inherit_cookies": True,  # 是否继承现有 Chrome 的 cookies
+    "user_data_dir": None,    # 用户数据目录，None 时自动检测
 }
 
 # 性能测试配置
@@ -157,6 +162,8 @@ DEFAULT_TEST_URLS = [
 export PERF_DOCTOR_CHROME_PATH="/path/to/chrome"
 export PERF_DOCTOR_CHROME_DEBUG_PORT=9222
 export PERF_DOCTOR_CHROME_HEADLESS=false
+export PERF_DOCTOR_CHROME_INHERIT_COOKIES=true
+export PERF_DOCTOR_CHROME_USER_DATA_DIR="/path/to/user/data"
 
 # 性能配置
 export PERF_DOCTOR_PERF_WAIT_TIME=5
@@ -169,6 +176,61 @@ export PERF_DOCTOR_REPORT_OUTPUT_DIR="./reports"
 # 日志配置
 export PERF_DOCTOR_LOG_LEVEL="INFO"
 export PERF_DOCTOR_LOG_FILE="./perf-doctor.log"
+```
+
+## 🍪 Cookie 继承功能
+
+> **解决业务页面登录跳转问题**
+
+Performance Doctor 支持智能继承现有 Chrome 浏览器的 cookies 和登录状态，避免分析需要登录的业务页面时跳转到登录页面。
+
+### 工作原理
+
+1. **自动检测**: 检测当前运行的 Chrome 进程及其用户数据目录
+2. **智能继承**: 使用相同的用户数据目录启动新的 Chrome 实例
+3. **降级策略**: 如果检测失败，自动降级到默认用户目录或独立测试目录
+
+### 配置选项
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `inherit_cookies` | `bool` | `True` | 是否启用 cookie 继承 |
+| `user_data_dir` | `str` | `None` | 手动指定用户数据目录 |
+
+### 使用场景
+
+#### ✅ 适用场景
+- 分析需要登录的业务页面
+- 测试用户登录后的页面性能
+- 分析包含用户个性化内容的页面
+- 需要保持会话状态的 SPA 应用
+
+#### ❌ 不适用场景
+- 需要完全独立测试环境
+- 分析公开页面（无需登录）
+- 需要避免 cookie 干扰的场景
+
+### 配置示例
+
+```python
+# 启用 cookie 继承（默认）
+doctor = PerformanceDoctor(inherit_cookies=True)
+
+# 禁用 cookie 继承
+doctor = PerformanceDoctor(inherit_cookies=False)
+
+# 手动指定用户数据目录
+doctor = PerformanceDoctor(
+    inherit_cookies=True,
+    user_data_dir="~/Library/Application Support/Google/Chrome"
+)
+```
+
+### 测试 Cookie 继承
+
+```bash
+# 运行 cookie 继承功能测试
+python test_cookie_inheritance.py
 ```
 
 ## 📊 输出示例

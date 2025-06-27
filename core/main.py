@@ -57,7 +57,9 @@ async def main():
     # 创建性能诊断器
     doctor = PerformanceDoctor(
         chrome_path=CHROME_CONFIG["path"],
-        debug_port=CHROME_CONFIG["debug_port"]
+        debug_port=CHROME_CONFIG["debug_port"],
+        inherit_cookies=CHROME_CONFIG["inherit_cookies"],
+        user_data_dir=CHROME_CONFIG["user_data_dir"]
     )
     
     try:

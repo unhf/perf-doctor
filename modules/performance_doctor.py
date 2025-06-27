@@ -16,15 +16,18 @@ from .report_generator import ReportGenerator
 class PerformanceDoctor:
     """页面性能诊断器"""
     
-    def __init__(self, chrome_path: Optional[str] = None, debug_port: int = 9222):
+    def __init__(self, chrome_path: Optional[str] = None, debug_port: int = 9222,
+                 inherit_cookies: bool = True, user_data_dir: Optional[str] = None):
         """
         初始化性能诊断器
         
         Args:
             chrome_path: Chrome 可执行文件路径
             debug_port: Chrome 调试端口
+            inherit_cookies: 是否继承现有 Chrome 的 cookies
+            user_data_dir: 用户数据目录，None 时自动检测或创建
         """
-        self.chrome_manager = ChromeManager(chrome_path, debug_port)
+        self.chrome_manager = ChromeManager(chrome_path, debug_port, inherit_cookies, user_data_dir)
         self.report_generator = ReportGenerator()
         self.logger = logging.getLogger(__name__)
         
