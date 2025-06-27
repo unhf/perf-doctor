@@ -215,7 +215,7 @@ class DevToolsClient:
         response = await self.send_command("Runtime.evaluate", {
             "expression": expression,
             "returnByValue": True
-        })
+        }, timeout=30.0)  # 增加超时时间到30秒
         
         if response and "result" in response:
             result = response["result"]

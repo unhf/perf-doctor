@@ -1,0 +1,282 @@
+{
+  "url": "https://example.com",
+  "timestamp": "2025-06-27T22:42:41.075244",
+  "wait_time": 10,
+  "paint_collector_data": {
+    "type": "paint_metrics",
+    "data": {
+      "first-paint": 124,
+      "first-contentful-paint": 124
+    },
+    "timestamp": 1751035350.9890208
+  },
+  "performance_data": {
+    "url": "https://example.com",
+    "timestamp": 1751035361.074189,
+    "load_time": 10,
+    "collector_status": {
+      "PerformanceMetricsCollector": {
+        "enabled": true,
+        "name": "PerformanceMetricsCollector",
+        "description": "Performance API 指标收集器",
+        "required_domains": [
+          "Performance"
+        ]
+      },
+      "PaintCollector": {
+        "enabled": true,
+        "name": "PaintCollector",
+        "description": "绘制指标收集器",
+        "required_domains": [
+          "Performance"
+        ]
+      },
+      "NavigationCollector": {
+        "enabled": true,
+        "name": "NavigationCollector",
+        "description": "导航时序收集器",
+        "required_domains": [
+          "Page"
+        ]
+      },
+      "MemoryCollector": {
+        "enabled": true,
+        "name": "MemoryCollector",
+        "description": "内存使用收集器",
+        "required_domains": [
+          "Runtime"
+        ]
+      },
+      "NetworkCollector": {
+        "enabled": true,
+        "name": "NetworkCollector",
+        "description": "网络请求收集器",
+        "required_domains": [
+          "Network"
+        ]
+      }
+    },
+    "performance_data": {
+      "summary": {
+        "total_collectors": 5,
+        "enabled_collectors": 5,
+        "successful_collections": 5,
+        "failed_collections": 0,
+        "collection_time": 1751035361.074152
+      },
+      "data": {
+        "PerformanceMetricsCollector": {
+          "type": "performance_metrics",
+          "data": {
+            "Timestamp": 137069.667777,
+            "AudioHandlers": 0,
+            "AudioWorkletProcessors": 0,
+            "Documents": 3,
+            "Frames": 1,
+            "JSEventListeners": 0,
+            "LayoutObjects": 25,
+            "MediaKeySessions": 0,
+            "MediaKeys": 0,
+            "Nodes": 74,
+            "Resources": 0,
+            "ContextLifecycleStateObservers": 4,
+            "V8PerContextDatas": 2,
+            "WorkerGlobalScopes": 0,
+            "UACSSResources": 0,
+            "RTCPeerConnections": 0,
+            "ResourceFetchers": 3,
+            "AdSubframes": 0,
+            "DetachedScriptStates": 1,
+            "ArrayBufferContents": 0,
+            "LayoutCount": 1,
+            "RecalcStyleCount": 1,
+            "LayoutDuration": 0.000415,
+            "RecalcStyleDuration": 0.000114,
+            "DevToolsCommandDuration": 0.002737,
+            "ScriptDuration": 0,
+            "V8CompileDuration": 0,
+            "TaskDuration": 0.006641,
+            "TaskOtherDuration": 0.003375,
+            "ThreadTime": 0.00718,
+            "ProcessTime": 0.092631,
+            "JSHeapUsedSize": 833400,
+            "JSHeapTotalSize": 1310720,
+            "FirstMeaningfulPaint": 137059.692499,
+            "DomContentLoaded": 137059.667159,
+            "NavigationStart": 137059.660613
+          },
+          "timestamp": 1751035361.0692952
+        },
+        "PaintCollector": {
+          "type": "paint_metrics",
+          "data": {
+            "first-paint": 32,
+            "first-contentful-paint": 32
+          },
+          "timestamp": 1751035361.0721831
+        },
+        "NavigationCollector": {
+          "type": "navigation_timing",
+          "data": {
+            "navigationStart": 1751035351059,
+            "fetchStart": 1751035351060,
+            "domainLookupStart": 1751035351060,
+            "domainLookupEnd": 1751035351060,
+            "connectStart": 1751035351060,
+            "connectEnd": 1751035351060,
+            "requestStart": 1751035351061,
+            "responseStart": 1751035351061,
+            "responseEnd": 1751035351061,
+            "domLoading": 1751035351065,
+            "domInteractive": 1751035351066,
+            "domContentLoadedEventStart": 1751035351066,
+            "domContentLoadedEventEnd": 1751035351066,
+            "domComplete": 1751035351066,
+            "loadEventStart": 1751035351066,
+            "loadEventEnd": 1751035351066,
+            "dnsLookup": 0,
+            "tcpConnect": 0,
+            "ttfb": 0,
+            "domReady": 7,
+            "pageLoad": 7,
+            "navigationType": 0,
+            "redirectCount": 0
+          },
+          "load_events": {
+            "loadEventFired": 137059.667331
+          },
+          "timestamp": 1751035361.073269
+        },
+        "MemoryCollector": {
+          "type": "memory_usage",
+          "data": {
+            "usedJSHeapSize": 883545,
+            "totalJSHeapSize": 1317757,
+            "jsHeapSizeLimit": 4294705152,
+            "heapUsagePercent": 67.04916004999404
+          },
+          "timestamp": 1751035361.073975
+        },
+        "NetworkCollector": {
+          "type": "network_requests",
+          "data": {
+            "statistics": {
+              "totalRequests": 1,
+              "totalSize": 0,
+              "avgResponseTime": 1.3768672943115234,
+              "apiRequests": 0,
+              "staticRequests": 0,
+              "thirdPartyRequests": 0,
+              "requestsByType": {
+                "unknown": 1
+              },
+              "requestsByDomain": {
+                "example.com": 1
+              }
+            },
+            "resources": [
+              {
+                "requestId": "82055406E7E60D454AF9CAFC26A2CD68",
+                "url": "https://example.com/",
+                "method": "GET",
+                "status": 200,
+                "mimeType": "text/html",
+                "transferSize": 0,
+                "responseTime": 1.3768672943115234,
+                "requestHeaders": {
+                  "Upgrade-Insecure-Requests": "1",
+                  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+                  "sec-ch-ua": "\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
+                  "sec-ch-ua-mobile": "?0",
+                  "sec-ch-ua-platform": "\"macOS\""
+                },
+                "responseHeaders": {
+                  "accept-ranges": "bytes",
+                  "alt-svc": "h3=\":443\"; ma=93600,h3-29=\":443\"; ma=93600",
+                  "cache-control": "max-age=3367",
+                  "content-encoding": "gzip",
+                  "content-length": "648",
+                  "content-type": "text/html",
+                  "date": "Fri, 27 Jun 2025 14:34:40 GMT",
+                  "etag": "\"84238dfc8092e5d9c0dac8ef93371a07:1736799080.121134\"",
+                  "last-modified": "Mon, 13 Jan 2025 20:11:20 GMT",
+                  "vary": "Accept-Encoding"
+                },
+                "requestBody": "",
+                "responseBody": "<!doctype html>\n<html>\n<head>\n    <title>Example Domain</title>\n\n    <meta charset=\"utf-8\" />\n    <meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <style type=\"text/css\">\n    body {\n        background-color: #f0f0f2;\n        margin: 0;\n        padding: 0;\n        font-family: -apple-system, system-ui, BlinkMacSystemFont, \"Segoe UI\", \"Open Sans\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n        \n    }\n    div {\n        width: 600px;\n        margin: 5em auto;\n        padding: 2em;\n        background-color: #fdfdff;\n        border-radius: 0.5em;\n        box-shadow: 2px 3px 7px 2px rgba(0,0,0,0.02);\n    }\n    a:link, a:visited {\n        color: #38488f;\n        text-decoration: none;\n    }\n    @media (max-width: 700px) {\n        div {\n            margin: 0 auto;\n            width: auto;\n        }\n    }\n    </style>    \n</head>\n\n<body>\n<div>\n    <h1>Example Domain</h1>\n    <p>This domain is for use in illustrative examples in documents. You may use this\n    domain in literature without prior coordination or asking for permission.</p>\n    <p><a href=\"https://www.iana.org/domains/example\">More information...</a></p>\n</div>\n</body>\n</html>\n",
+                "errorText": "",
+                "timestamp": 1751035351.061001,
+                "domain": "example.com",
+                "isStatic": false,
+                "isApi": false,
+                "isThirdParty": false,
+                "category": "Other"
+              }
+            ],
+            "analysis": {
+              "large_resources": [],
+              "slow_requests": [],
+              "api_requests": [],
+              "static_resources": [],
+              "third_party_resources": []
+            }
+          }
+        }
+      },
+      "timestamp": 1751035361.074153
+    }
+  },
+  "report_lcp": 0,
+  "key_metrics": {
+    "fcp": 32,
+    "ttfb": 0,
+    "dom_ready": 7,
+    "page_load": 7,
+    "dns_lookup": 0,
+    "tcp_connect": 0,
+    "Timestamp": 137069.667777,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 3,
+    "Frames": 1,
+    "JSEventListeners": 0,
+    "LayoutObjects": 25,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 74,
+    "Resources": 0,
+    "ContextLifecycleStateObservers": 4,
+    "V8PerContextDatas": 2,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 3,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 1,
+    "ArrayBufferContents": 0,
+    "LayoutCount": 1,
+    "RecalcStyleCount": 1,
+    "LayoutDuration": 0.000415,
+    "RecalcStyleDuration": 0.000114,
+    "DevToolsCommandDuration": 0.002737,
+    "ScriptDuration": 0,
+    "V8CompileDuration": 0,
+    "TaskDuration": 0.006641,
+    "TaskOtherDuration": 0.003375,
+    "ThreadTime": 0.00718,
+    "ProcessTime": 0.092631,
+    "JSHeapUsedSize": 833400,
+    "JSHeapTotalSize": 1310720,
+    "FirstMeaningfulPaint": 137059.692499,
+    "DomContentLoaded": 137059.667159,
+    "NavigationStart": 137059.660613,
+    "memory_used": 883545,
+    "memory_total": 1317757,
+    "memory_limit": 4294705152,
+    "total_requests": 1,
+    "total_size": 0,
+    "avg_response_time": 1.0,
+    "api_requests": 0,
+    "third_party_requests": 0
+  }
+}
